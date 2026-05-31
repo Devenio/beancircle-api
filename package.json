@@ -21,7 +21,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "smoke": "bash scripts/smoke-test.sh"
+    "smoke": "bash scripts/smoke-test.sh",
+    "dev:local": "bash scripts/dev-local.sh",
+    "dev:local:setup": "bash scripts/dev-local.sh --setup"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1057.0",
@@ -101,5 +103,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "engines": {
+    "node": ">=20.11.0 <23 || >=24"
   }
 }
