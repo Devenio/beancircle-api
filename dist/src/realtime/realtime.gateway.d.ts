@@ -3,12 +3,14 @@ import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { RedisService } from '../redis/redis.service';
 import { ChatService } from '../chat/chat.service';
+import { PrismaService } from '../prisma/prisma.service';
 export declare class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private jwt;
     private redis;
+    private prisma;
     private chatService;
     server: Server;
-    constructor(jwt: JwtService, redis: RedisService, chatService: ChatService);
+    constructor(jwt: JwtService, redis: RedisService, prisma: PrismaService, chatService: ChatService);
     handleConnection(client: Socket): Promise<void>;
     handleDisconnect(client: Socket): Promise<void>;
     emitToUser(userId: string, event: string, data: unknown): void;
@@ -18,6 +20,11 @@ export declare class RealtimeGateway implements OnGatewayConnection, OnGatewayDi
         conversationId: string;
         typing: boolean;
     }): void;
+    handleConversationTyping(client: Socket, data: {
+        conversationId: string;
+        typing?: boolean;
+    }): void;
+    leaveConversation(client: Socket, conversationId: string): Promise<void>;
     handleRead(client: Socket, data: {
         conversationId: string;
     }): Promise<void>;

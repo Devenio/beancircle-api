@@ -27,6 +27,11 @@ enum CafePhotoKind {
 enum MessageType {
   TEXT
   IMAGE
+  FILE
+  LOCATION
+  VOICE
+  VIDEO
+  STICKER
 }
 
 enum NotificationType {
@@ -342,6 +347,21 @@ model Message {
   type           MessageType @default(TEXT)
   body           String?
   imageUrl       String?
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentMimeType String?
+  attachmentSize Int?
+  attachmentDurationSec Int?
+  locationLat    Float?
+  locationLng    Float?
+  locationLabel  String?
+  sticker        String?
+  replyToId      String?
+  replyToSnippet String?
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  isPinned       Boolean     @default(false)
+  seenBy         String[]    @default([])
   createdAt      DateTime    @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User        @relation(fields: [senderId], references: [id], onDelete: Cascade)

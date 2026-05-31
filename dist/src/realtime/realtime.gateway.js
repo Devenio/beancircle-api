@@ -19,23 +19,34 @@ const websockets_1 = require("@nestjs/websockets");
 const socket_io_1 = require("socket.io");
 const redis_service_1 = require("../redis/redis.service");
 const chat_service_1 = require("../chat/chat.service");
+const prisma_service_1 = require("../prisma/prisma.service");
+function getSocketData(client) {
+    return client.data;
+}
 let RealtimeGateway = class RealtimeGateway {
     jwt;
     redis;
+    prisma;
     chatService;
     server;
-    constructor(jwt, redis, chatService) {
+    constructor(jwt, redis, prisma, chatService) {
         this.jwt = jwt;
         this.redis = redis;
+        this.prisma = prisma;
         this.chatService = chatService;
     }
     async handleConnection(client) {
         try {
             const token = client.handshake.auth?.token ||
-                (client.handshake.headers.authorization?.replace('Bearer ', '') ??
-                    '');
+                (client.handshake.headers.authorization?.replace('Bearer ', '') ?? '');
             const payload = await this.jwt.verifyAsync(token);
-            client.data.userId = payload.sub;
+            const socketData = getSocketData(client);
+            socketData.userId = payload.sub;
+            const user = await this.prisma.user.findUnique({
+                where: { id: payload.sub },
+                select: { username: true },
+            });
+            socketData.username = user?.username ?? null;
             await client.join(`user:${payload.sub}`);
             await this.redis.setOnline(payload.sub);
             this.server.emit('presence', { userId: payload.sub, online: true });
@@ -45,7 +56,7 @@ let RealtimeGateway = class RealtimeGateway {
         }
     }
     async handleDisconnect(client) {
-        const userId = client.data.userId;
+        const userId = getSocketData(client).userId;
         if (userId) {
             await this.redis.setOffline(userId);
             this.server.emit('presence', { userId, online: false });
@@ -58,18 +69,39 @@ let RealtimeGateway = class RealtimeGateway {
         this.server.to(`conversation:${conversationId}`).emit(event, data);
     }
     async joinConversation(client, conversationId) {
-        const userId = client.data.userId;
+        const userId = getSocketData(client).userId;
+        if (!userId)
+            return;
         const member = await this.chatService.isMember(conversationId, userId);
         if (member)
             await client.join(`conversation:${conversationId}`);
     }
     handleTyping(client, data) {
+        const socketData = getSocketData(client);
+        const payload = {
+            userId: socketData.userId,
+            username: socketData.username,
+            typing: data.typing,
+            conversationId: data.conversationId,
+        };
+        client.to(`conversation:${data.conversationId}`).emit('typing', payload);
         client
             .to(`conversation:${data.conversationId}`)
-            .emit('typing', { userId: client.data.userId, typing: data.typing });
+            .emit('conversation:typing', payload);
+    }
+    handleConversationTyping(client, data) {
+        this.handleTyping(client, {
+            conversationId: data.conversationId,
+            typing: data.typing ?? true,
+        });
+    }
+    async leaveConversation(client, conversationId) {
+        await client.leave(`conversation:${conversationId}`);
     }
     async handleRead(client, data) {
-        const userId = client.data.userId;
+        const userId = getSocketData(client).userId;
+        if (!userId)
+            return;
         await this.chatService.markRead(data.conversationId, userId);
         this.emitToConversation(data.conversationId, 'message:read', {
             userId,
@@ -99,6 +131,22 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RealtimeGateway.prototype, "handleTyping", null);
 __decorate([
+    (0, websockets_1.SubscribeMessage)('conversation:typing'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], RealtimeGateway.prototype, "handleConversationTyping", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('conversation:leave'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, String]),
+    __metadata("design:returntype", Promise)
+], RealtimeGateway.prototype, "leaveConversation", null);
+__decorate([
     (0, websockets_1.SubscribeMessage)('message:read'),
     __param(0, (0, websockets_1.ConnectedSocket)()),
     __param(1, (0, websockets_1.MessageBody)()),
@@ -108,9 +156,10 @@ __decorate([
 ], RealtimeGateway.prototype, "handleRead", null);
 exports.RealtimeGateway = RealtimeGateway = __decorate([
     (0, websockets_1.WebSocketGateway)({ cors: { origin: '*' } }),
-    __param(2, (0, common_1.Inject)((0, common_1.forwardRef)(() => chat_service_1.ChatService))),
+    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => chat_service_1.ChatService))),
     __metadata("design:paramtypes", [jwt_1.JwtService,
         redis_service_1.RedisService,
+        prisma_service_1.PrismaService,
         chat_service_1.ChatService])
 ], RealtimeGateway);
 //# sourceMappingURL=realtime.gateway.js.map
