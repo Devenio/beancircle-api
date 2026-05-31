@@ -1,0 +1,404 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PostType {
+  PHOTO
+  TEXT
+  PHOTO_TEXT
+  CHECKIN
+}
+
+enum CafePhotoKind {
+  GALLERY
+  MENU
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  NEW_COMMENT
+  NEW_LIKE
+  NEW_MESSAGE
+  GIFT_COFFEE
+}
+
+enum GiftStatus {
+  PENDING_PAYMENT
+  PAID
+  ASSIGNED
+  REDEEMED
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportTargetType {
+  USER
+  POST
+  REVIEW
+  CAFE
+  MESSAGE
+}
+
+model Country {
+  id     String @id @default(uuid())
+  code   String @unique
+  name   String
+  cities City[]
+  users  User[]
+  cafes  Cafe[]
+  posts  Post[]
+  reviews Review[]
+  checkins Checkin[]
+  gifts  GiftCoffee[]
+}
+
+model City {
+  id        String   @id @default(uuid())
+  countryId String
+  name      String
+  slug      String
+  country   Country  @relation(fields: [countryId], references: [id])
+  users     User[]
+  cafes     Cafe[]
+  posts     Post[]
+  reviews   Review[]
+  checkins  Checkin[]
+  gifts     GiftCoffee[]
+  favoriteCafes FavoriteCafe[]
+
+  @@unique([countryId, slug])
+}
+
+model User {
+  id              String    @id @default(uuid())
+  phone           String?   @unique
+  email           String?   @unique
+  googleId        String?   @unique
+  username        String?   @unique
+  name            String?
+  bio             String?
+  avatarUrl       String?
+  cityId          String?
+  countryId       String?
+  role            UserRole  @default(USER)
+  postsCount      Int       @default(0)
+  followersCount  Int       @default(0)
+  followingCount  Int       @default(0)
+  refreshTokenHash String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  city            City?     @relation(fields: [cityId], references: [id])
+  country         Country?  @relation(fields: [countryId], references: [id])
+  devices         Device[]
+  posts           Post[]
+  comments        Comment[]
+  likes           Like[]
+  savedPosts      SavedPost[]
+  reviews         Review[]
+  checkins        Checkin[]
+  followers       UserFollow[] @relation("following")
+  following       UserFollow[] @relation("follower")
+  cafeFollows     CafeFollow[]
+  favoriteCafes   FavoriteCafe[]
+  conversationMembers ConversationMember[]
+  messagesSent    Message[]
+  notifications   Notification[]
+  notificationsActed Notification[] @relation("NotificationActor")
+  reports         Report[]
+  giftsSent       GiftCoffee[] @relation("GiftSender")
+  giftsReceived   GiftCoffee[] @relation("GiftReceiver")
+  voucherRedemptions VoucherRedemption[]
+}
+
+model Device {
+  id         String   @id @default(uuid())
+  userId     String
+  pushToken  String?
+  platform   String
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserFollow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+model Cafe {
+  id             String   @id @default(uuid())
+  name           String
+  address        String
+  lat            Float
+  lng            Float
+  cityId         String
+  countryId      String
+  avgRating      Float    @default(0)
+  followerCount  Int      @default(0)
+  reviewCount    Int      @default(0)
+  isPartner      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  city           City     @relation(fields: [cityId], references: [id])
+  country        Country  @relation(fields: [countryId], references: [id])
+  photos         CafePhoto[]
+  posts          Post[]
+  reviews        Review[]
+  checkins       Checkin[]
+  followers      CafeFollow[]
+  favorites      FavoriteCafe[]
+  voucherRedemptions VoucherRedemption[]
+}
+
+model CafePhoto {
+  id     String        @id @default(uuid())
+  cafeId String
+  url    String
+  kind   CafePhotoKind @default(GALLERY)
+  order  Int           @default(0)
+  cafe   Cafe          @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+}
+
+model CafeFollow {
+  id         String   @id @default(uuid())
+  userId     String
+  cafeId     String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cafe       Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cafeId])
+}
+
+model FavoriteCafe {
+  id     String @id @default(uuid())
+  userId String
+  cafeId String
+  cityId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cafe   Cafe   @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  city   City   @relation(fields: [cityId], references: [id])
+
+  @@unique([userId, cafeId])
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  authorId  String
+  cafeId    String?
+  checkinId String?  @unique
+  type      PostType
+  caption   String?
+  cityId    String
+  countryId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  cafe      Cafe?    @relation(fields: [cafeId], references: [id])
+  checkin   Checkin? @relation(fields: [checkinId], references: [id])
+  city      City     @relation(fields: [cityId], references: [id])
+  country   Country  @relation(fields: [countryId], references: [id])
+  photos    PostPhoto[]
+  comments  Comment[]
+  likes     Like[]
+  savedBy   SavedPost[]
+}
+
+model PostPhoto {
+  id     String @id @default(uuid())
+  postId String
+  url    String
+  order  Int    @default(0)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  authorId  String
+  postId    String?
+  reviewId  String?
+  body      String
+  createdAt DateTime @default(now())
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  review    Review?  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model Like {
+  id       String  @id @default(uuid())
+  userId   String
+  postId   String?
+  reviewId String?
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post     Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  review   Review? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@unique([userId, reviewId])
+}
+
+model SavedPost {
+  id     String @id @default(uuid())
+  userId String
+  postId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  cafeId    String
+  authorId  String
+  rating    Int
+  body      String?
+  cityId    String
+  countryId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  city      City     @relation(fields: [cityId], references: [id])
+  country   Country  @relation(fields: [countryId], references: [id])
+  photos    ReviewPhoto[]
+  comments  Comment[]
+  likes     Like[]
+}
+
+model ReviewPhoto {
+  id       String @id @default(uuid())
+  reviewId String
+  url      String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model Checkin {
+  id        String   @id @default(uuid())
+  userId    String
+  cafeId    String
+  cityId    String
+  countryId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  city      City     @relation(fields: [cityId], references: [id])
+  country   Country  @relation(fields: [countryId], references: [id])
+  post      Post?
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   ConversationMember[]
+  messages  Message[]
+}
+
+model ConversationMember {
+  id             String       @id @default(uuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  senderId       String
+  type           MessageType @default(TEXT)
+  body           String?
+  imageUrl       String?
+  createdAt      DateTime    @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  userId     String
+  type       NotificationType
+  actorId    String?
+  entityType String?
+  entityId   String?
+  payload    Json?
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor      User?            @relation("NotificationActor", fields: [actorId], references: [id])
+}
+
+model GiftCoffee {
+  id          String     @id @default(uuid())
+  senderId    String
+  receiverId  String?
+  amount      Int
+  cityId      String
+  countryId   String
+  status      GiftStatus @default(PENDING_PAYMENT)
+  paymentRef  String?
+  voucherCode String?    @unique
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  sender      User       @relation("GiftSender", fields: [senderId], references: [id])
+  receiver    User?      @relation("GiftReceiver", fields: [receiverId], references: [id])
+  city        City       @relation(fields: [cityId], references: [id])
+  country     Country    @relation(fields: [countryId], references: [id])
+  redemptions VoucherRedemption[]
+}
+
+model VoucherRedemption {
+  id               String   @id @default(uuid())
+  giftId           String
+  cafeId           String
+  redeemedByUserId String?
+  redeemedAt       DateTime @default(now())
+  gift             GiftCoffee @relation(fields: [giftId], references: [id])
+  cafe             Cafe     @relation(fields: [cafeId], references: [id])
+  redeemedBy       User?    @relation(fields: [redeemedByUserId], references: [id])
+}
+
+model Report {
+  id         String           @id @default(uuid())
+  reporterId String
+  targetType ReportTargetType
+  targetId   String
+  reason     String
+  status     ReportStatus     @default(PENDING)
+  createdAt  DateTime         @default(now())
+  reporter   User             @relation(fields: [reporterId], references: [id])
+}
