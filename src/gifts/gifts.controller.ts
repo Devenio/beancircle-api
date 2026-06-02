@@ -1,8 +1,17 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { IsInt, IsString, Min } from 'class-validator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { GiftsService } from './gifts.service';
 
 class CreateGiftDto {
@@ -30,8 +39,12 @@ export class GiftsController {
 
   @Public()
   @Post('webhook/payment')
-  webhook(@Body('giftId') giftId: string) {
-    return this.giftsService.completePayment(giftId);
+  webhook(
+    @Headers('x-webhook-signature') signature: string | undefined,
+    @Body() dto: PaymentWebhookDto,
+  ) {
+    this.giftsService.verifyWebhookSignature(signature, dto);
+    return this.giftsService.completePayment(dto.giftId);
   }
 
   @Get(':id/voucher')

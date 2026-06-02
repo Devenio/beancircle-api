@@ -9,8 +9,20 @@ import { ChatModule } from './chat/chat.module';
 import { CheckinsModule } from './checkins/checkins.module';
 import { CommentsModule } from './comments/comments.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { BeanScoreModule } from './beanscore/beanscore.module';
+import { CommunityModule } from './community/community.module';
+import { DiscoverModule } from './discover/discover.module';
+import { ReactionsModule } from './reactions/reactions.module';
+import { WorkModule } from './work/work.module';
+import { OwnerModule } from './owner/owner.module';
+import { ChallengesModule } from './challenges/challenges.module';
+import { EventsModule } from './events/events.module';
+import { GrowthModule } from './growth/growth.module';
 import { GiftsModule } from './gifts/gifts.module';
+import { HomeModule } from './home/home.module';
+import { PassportModule } from './passport/passport.module';
 import { LikesModule } from './likes/likes.module';
+import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PostsModule } from './posts/posts.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -39,6 +51,18 @@ import { UsersModule } from './users/users.module';
     ChatModule,
     NotificationsModule,
     GiftsModule,
+    HomeModule,
+    PassportModule,
+    DiscoverModule,
+    BeanScoreModule,
+    CommunityModule,
+    ReactionsModule,
+    WorkModule,
+    OwnerModule,
+    ChallengesModule,
+    EventsModule,
+    GrowthModule,
+    ReportsModule,
     AdminModule,
     UploadsModule,
     RealtimeModule,

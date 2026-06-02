@@ -23,7 +23,12 @@ function getSocketData(client: Socket): SocketAuthData {
   return client.data as SocketAuthData;
 }
 
-@WebSocketGateway({ cors: { origin: '*' } })
+@WebSocketGateway({
+  cors: {
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    credentials: true,
+  },
+})
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
@@ -87,13 +92,17 @@ export class RealtimeGateway
   }
 
   @SubscribeMessage('typing')
-  handleTyping(
+  async handleTyping(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string; typing: boolean },
   ) {
     const socketData = getSocketData(client);
+    const userId = socketData.userId;
+    if (!userId || !data.conversationId) return;
+    const member = await this.chatService.isMember(data.conversationId, userId);
+    if (!member) return;
     const payload = {
-      userId: socketData.userId,
+      userId,
       username: socketData.username,
       typing: data.typing,
       conversationId: data.conversationId,

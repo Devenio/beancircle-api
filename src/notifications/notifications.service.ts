@@ -71,4 +71,10 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
   }
+
+  unreadCount(userId: string) {
+    return this.prisma.notification.count({
+      where: { userId, readAt: null },
+    });
+  }
 }

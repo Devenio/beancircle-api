@@ -8,10 +8,11 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { MessageType } from '@prisma/client';
+import { MessageType, ReactionEmoji } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsIn,
   IsInt,
   IsNumber,
@@ -135,6 +136,11 @@ class PinMessageDto {
   pinned?: boolean;
 }
 
+class MessageReactionDto {
+  @IsEnum(ReactionEmoji)
+  emoji: ReactionEmoji;
+}
+
 @Controller()
 export class ChatController {
   constructor(private chatService: ChatService) {}
@@ -196,6 +202,21 @@ export class ChatController {
     @Param('messageId') messageId: string,
   ) {
     return this.chatService.markMessageSeen(id, messageId, user.id);
+  }
+
+  @Post('conversations/:id/messages/:messageId/reactions')
+  react(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Param('messageId') messageId: string,
+    @Body() dto: MessageReactionDto,
+  ) {
+    return this.chatService.toggleMessageReaction(
+      id,
+      messageId,
+      user.id,
+      dto.emoji,
+    );
   }
 
   @Post('conversations/:id/messages/:messageId/pin')

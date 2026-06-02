@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { BeanScoreAction } from '@prisma/client';
+import { BeanScoreService } from '../beanscore/beanscore.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private beanScore: BeanScoreService,
+  ) {}
 
   async create(
     authorId: string,
@@ -47,6 +52,7 @@ export class ReviewsService {
         reviewCount: agg._count,
       },
     });
+    await this.beanScore.award(authorId, BeanScoreAction.REVIEW, review.id);
     return review;
   }
 

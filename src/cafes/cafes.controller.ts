@@ -11,8 +11,10 @@ import {
 } from '@nestjs/common';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CafesService } from './cafes.service';
 import { CheckinsService } from '../checkins/checkins.service';
+import { CreateCafeDto } from './dto/create-cafe.dto';
+import { UpdateCafeDto } from './dto/update-cafe.dto';
+import { CafesService } from './cafes.service';
 
 @Controller('cafes')
 export class CafesController {
@@ -48,13 +50,13 @@ export class CafesController {
 
   @Post()
   @UseGuards(AdminGuard)
-  create(@Body() body: Record<string, unknown>) {
-    return this.cafesService.create(body as Parameters<CafesService['create']>[0]);
+  create(@Body() dto: CreateCafeDto) {
+    return this.cafesService.create(dto);
   }
 
   @Patch(':id')
   @UseGuards(AdminGuard)
-  update(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.cafesService.update(id, body as Parameters<CafesService['update']>[1]);
+  update(@Param('id') id: string, @Body() dto: UpdateCafeDto) {
+    return this.cafesService.update(id, dto);
   }
 }

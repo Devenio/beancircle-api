@@ -63,6 +63,56 @@ enum ReportTargetType {
   MESSAGE
 }
 
+enum BadgeCode {
+  FIRST_CHECKIN
+  FIVE_CAFES
+  TEN_CAFES
+  TWENTY_CAFES
+  WEEKLY_EXPLORER
+}
+
+enum RewardType {
+  FREE_DRINK
+  DISCOUNT_10
+  DISCOUNT_20
+  PARTNER_PERK
+}
+
+enum CheckinSource {
+  APP
+  QR
+}
+
+enum BeanScoreAction {
+  CHECKIN
+  NEW_STAMP
+  POST
+  POST_PHOTO
+  REVIEW
+  LIKE_RECEIVED
+  DAILY_ACTIVE
+  REFERRAL
+  CHALLENGE_COMPLETE
+}
+
+enum ChallengeType {
+  CHECKIN_COUNT
+  NEW_STAMPS
+  VISIT_UNIQUE_CAFES
+}
+
+enum EventRsvpStatus {
+  GOING
+  INTERESTED
+}
+
+enum ReactionEmoji {
+  LIKE
+  HEART
+  FIRE
+  CLAP
+}
+
 model Country {
   id     String @id @default(uuid())
   code   String @unique
@@ -89,6 +139,8 @@ model City {
   checkins  Checkin[]
   gifts     GiftCoffee[]
   favoriteCafes FavoriteCafe[]
+  challenges CommunityChallenge[]
+  events     CommunityEvent[]
 
   @@unique([countryId, slug])
 }
@@ -105,6 +157,8 @@ model User {
   cityId          String?
   countryId       String?
   role            UserRole  @default(USER)
+  referralCode    String?   @unique
+  referredById    String?
   postsCount      Int       @default(0)
   followersCount  Int       @default(0)
   followingCount  Int       @default(0)
@@ -112,6 +166,7 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  refreshTokens   RefreshToken[]
   city            City?     @relation(fields: [cityId], references: [id])
   country         Country?  @relation(fields: [countryId], references: [id])
   devices         Device[]
@@ -133,6 +188,33 @@ model User {
   giftsSent       GiftCoffee[] @relation("GiftSender")
   giftsReceived   GiftCoffee[] @relation("GiftReceiver")
   voucherRedemptions VoucherRedemption[]
+  passport           Passport?
+  userBadges         UserBadge[]
+  userRewards        UserReward[]
+  beanScore          BeanScoreProfile?
+  beanScoreEvents    BeanScoreEvent[]
+  postReactions      PostReaction[]
+  workReports        WorkReport[]
+  messageReactions   MessageReaction[]
+  cafeOwnerships     CafeOwner[]
+  challengeEntries   ChallengeParticipation[]
+  eventRsvps         EventRsvp[]
+  referralsMade      Referral[] @relation("Referrer")
+  referralAsReferred Referral?
+  referredBy         User?      @relation("UserReferrals", fields: [referredById], references: [id])
+  usersReferred      User[]     @relation("UserReferrals")
+}
+
+model Referral {
+  id              String   @id @default(uuid())
+  referrerId      String
+  referredUserId  String   @unique
+  pointsAwarded   Int      @default(50)
+  createdAt       DateTime @default(now())
+  referrer        User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred        User     @relation(fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId, createdAt])
 }
 
 model Device {
@@ -167,6 +249,21 @@ model Cafe {
   followerCount  Int      @default(0)
   reviewCount    Int      @default(0)
   isPartner      Boolean  @default(false)
+  checkinCode    String?  @unique
+  claimCode      String?  @unique
+  bestCoffee     Boolean  @default(false)
+  bestWorkspace  Boolean  @default(false)
+  quiet          Boolean  @default(false)
+  studyFriendly  Boolean  @default(false)
+  fastWifi       Boolean  @default(false)
+  outdoorSeating Boolean  @default(false)
+  dateFriendly   Boolean  @default(false)
+  petFriendly    Boolean  @default(false)
+  workspaceScore Int      @default(0)
+  liveWifiScore      Float?
+  liveNoiseLevel     Float?
+  liveOutletScore    Float?
+  workReportCount    Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -179,6 +276,15 @@ model Cafe {
   followers      CafeFollow[]
   favorites      FavoriteCafe[]
   voucherRedemptions VoucherRedemption[]
+  stamps             Stamp[]
+  workReports        WorkReport[]
+  owners             CafeOwner[]
+  events             CommunityEvent[]
+
+  @@index([cityId])
+  @@index([cityId, avgRating])
+  @@index([createdAt])
+  @@index([followerCount])
 }
 
 model CafePhoto {
@@ -233,7 +339,12 @@ model Post {
   photos    PostPhoto[]
   comments  Comment[]
   likes     Like[]
+  reactions PostReaction[]
   savedBy   SavedPost[]
+
+  @@index([authorId, createdAt])
+  @@index([cafeId, createdAt])
+  @@index([createdAt])
 }
 
 model PostPhoto {
@@ -297,6 +408,8 @@ model Review {
   photos    ReviewPhoto[]
   comments  Comment[]
   likes     Like[]
+
+  @@index([cafeId, createdAt])
 }
 
 model ReviewPhoto {
@@ -307,18 +420,92 @@ model ReviewPhoto {
 }
 
 model Checkin {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   userId    String
   cafeId    String
   cityId    String
   countryId String
-  createdAt DateTime @default(now())
+  source    CheckinSource @default(APP)
+  createdAt DateTime      @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
   city      City     @relation(fields: [cityId], references: [id])
   country   Country  @relation(fields: [countryId], references: [id])
   post      Post?
+  stamp     Stamp?
+
+  @@index([userId, createdAt])
+  @@index([cafeId, createdAt])
+  @@index([userId, cafeId, createdAt])
+}
+
+model Passport {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  totalStamps    Int      @default(0)
+  totalCheckins  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stamps         Stamp[]
+}
+
+model Stamp {
+  id         String   @id @default(uuid())
+  passportId String
+  cafeId     String
+  checkinId  String?  @unique
+  earnedAt   DateTime @default(now())
+  passport   Passport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  cafe       Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  checkin    Checkin? @relation(fields: [checkinId], references: [id], onDelete: SetNull)
+  @@unique([passportId, cafeId])
+  @@index([passportId, earnedAt])
+}
+
+model BadgeDefinition {
+  code          BadgeCode @id
+  name          String
+  description   String
+  iconKey       String
+  threshold     Int
+  thresholdType String
+  userBadges    UserBadge[]
+}
+
+model UserBadge {
+  id        String    @id @default(uuid())
+  userId    String
+  badgeCode BadgeCode
+  earnedAt  DateTime  @default(now())
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     BadgeDefinition @relation(fields: [badgeCode], references: [code])
+  @@unique([userId, badgeCode])
+  @@index([userId, earnedAt])
+}
+
+model RewardDefinition {
+  id             String     @id @default(uuid())
+  slug           String     @unique
+  title          String
+  description    String
+  requiredStamps Int
+  rewardType     RewardType
+  active         Boolean    @default(true)
+  userRewards    UserReward[]
+}
+
+model UserReward {
+  id         String    @id @default(uuid())
+  userId     String
+  rewardId   String
+  unlockedAt DateTime  @default(now())
+  redeemedAt DateTime?
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward     RewardDefinition @relation(fields: [rewardId], references: [id])
+  @@unique([userId, rewardId])
+  @@index([userId, unlockedAt])
 }
 
 model Conversation {
@@ -365,6 +552,69 @@ model Message {
   createdAt      DateTime    @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reactions      MessageReaction[]
+
+  @@index([conversationId, createdAt])
+}
+
+model BeanScoreProfile {
+  userId           String    @id
+  totalPoints      Int       @default(0)
+  level            Int       @default(1)
+  lastDailyBonusAt DateTime?
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([totalPoints])
+}
+
+model BeanScoreEvent {
+  id          String          @id @default(uuid())
+  userId      String
+  action      BeanScoreAction
+  points      Int
+  referenceId String?
+  createdAt   DateTime        @default(now())
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, action, referenceId])
+  @@index([userId, createdAt])
+}
+
+model PostReaction {
+  id        String        @id @default(uuid())
+  userId    String
+  postId    String
+  emoji     ReactionEmoji @default(LIKE)
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  @@unique([userId, postId])
+  @@index([postId])
+}
+
+model MessageReaction {
+  id        String        @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     ReactionEmoji
+  createdAt DateTime      @default(now())
+  message   Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model WorkReport {
+  id          String   @id @default(uuid())
+  userId      String
+  cafeId      String
+  wifiScore   Int
+  noiseLevel  Int
+  outletScore Int
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cafe        Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  @@index([cafeId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Notification {
@@ -379,6 +629,22 @@ model Notification {
   createdAt  DateTime         @default(now())
   user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   actor      User?            @relation("NotificationActor", fields: [actorId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model GiftCoffee {
@@ -412,6 +678,82 @@ model VoucherRedemption {
   redeemedBy       User?    @relation(fields: [redeemedByUserId], references: [id])
 }
 
+model CafeOwner {
+  userId    String
+  cafeId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, cafeId])
+  @@index([cafeId])
+}
+
+model CommunityChallenge {
+  id           String        @id @default(uuid())
+  title        String
+  description  String
+  type         ChallengeType
+  goal         Int
+  rewardPoints Int           @default(100)
+  cityId       String?
+  startsAt     DateTime
+  endsAt       DateTime
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  city         City?         @relation(fields: [cityId], references: [id])
+  participants ChallengeParticipation[]
+
+  @@index([active, endsAt])
+  @@index([cityId, startsAt])
+}
+
+model ChallengeParticipation {
+  id          String    @id @default(uuid())
+  userId      String
+  challengeId String
+  progress    Int       @default(0)
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge   CommunityChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId])
+  @@index([challengeId, progress])
+}
+
+model CommunityEvent {
+  id            String   @id @default(uuid())
+  title         String
+  description   String
+  cafeId        String?
+  cityId        String?
+  locationLabel String?
+  coverUrl      String?
+  startsAt      DateTime
+  endsAt        DateTime
+  createdAt     DateTime @default(now())
+  cafe          Cafe?    @relation(fields: [cafeId], references: [id], onDelete: SetNull)
+  city          City?    @relation(fields: [cityId], references: [id])
+  rsvps         EventRsvp[]
+
+  @@index([startsAt])
+  @@index([cityId, startsAt])
+}
+
+model EventRsvp {
+  id        String          @id @default(uuid())
+  userId    String
+  eventId   String
+  status    EventRsvpStatus @default(GOING)
+  createdAt DateTime        @default(now())
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     CommunityEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+}
+
 model Report {
   id         String           @id @default(uuid())
   reporterId String
@@ -421,4 +763,7 @@ model Report {
   status     ReportStatus     @default(PENDING)
   createdAt  DateTime         @default(now())
   reporter   User             @relation(fields: [reporterId], references: [id])
+
+  @@index([reporterId, createdAt])
+  @@index([status, createdAt])
 }

@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GiftStatus, NotificationType } from '@prisma/client';
+import { createHash } from 'crypto';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -41,6 +43,33 @@ export class GiftsService {
       gift,
       paymentUrl: `${this.config.get('FRONTEND_URL')}/gift/pay/${gift.id}`,
     };
+  }
+
+  verifyWebhookSignature(
+    signature: string | undefined,
+    body: { giftId: string; paymentRef?: string },
+  ) {
+    const secret = this.config.get<string>('GIFT_WEBHOOK_SECRET');
+    if (!secret) {
+      if (this.config.get('NODE_ENV') === 'production') {
+        throw new UnauthorizedException('Webhook not configured');
+      }
+      return;
+    }
+    if (!signature) {
+      throw new UnauthorizedException('Missing webhook signature');
+    }
+    const payload = JSON.stringify({
+      giftId: body.giftId,
+      paymentRef: body.paymentRef ?? null,
+    });
+    const expected = createHash('sha256')
+      .update(`${payload}.${secret}`)
+      .digest('hex');
+    const provided = signature.replace(/^sha256=/, '');
+    if (expected !== provided) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
   }
 
   async completePayment(giftId: string) {

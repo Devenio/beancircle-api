@@ -37,4 +37,18 @@ export class RedisService implements OnModuleDestroy {
   async setOffline(userId: string) {
     await this.client.del(`online:${userId}`);
   }
+
+  async setAuthCode(code: string, payload: object, ttlSeconds = 60) {
+    await this.client.setex(`authcode:${code}`, ttlSeconds, JSON.stringify(payload));
+  }
+
+  async getAuthCode<T>(code: string): Promise<T | null> {
+    const raw = await this.client.get(`authcode:${code}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  }
+
+  async delAuthCode(code: string) {
+    await this.client.del(`authcode:${code}`);
+  }
 }

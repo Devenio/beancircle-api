@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { NotificationType, PostType } from '@prisma/client';
+import { BeanScoreAction, NotificationType, PostType } from '@prisma/client';
+import { BeanScoreService } from '../beanscore/beanscore.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -8,6 +9,7 @@ export class PostsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private beanScore: BeanScoreService,
   ) {}
 
   async create(
@@ -55,6 +57,10 @@ export class PostsService {
       });
       return p;
     });
+    await this.beanScore.award(authorId, BeanScoreAction.POST, post.id);
+    if (data.photoUrls?.length) {
+      await this.beanScore.award(authorId, BeanScoreAction.POST_PHOTO, post.id);
+    }
     return post;
   }
 
@@ -131,25 +137,35 @@ export class PostsService {
       photos: { orderBy: { order: 'asc' as const } },
       cafe: true,
       checkin: { include: { cafe: true } },
-      _count: { select: { likes: true, comments: true } },
+      _count: { select: { likes: true, comments: true, reactions: true } },
       ...(userId
         ? {
             likes: { where: { userId }, take: 1 },
             savedBy: { where: { userId }, take: 1 },
+            reactions: { where: { userId }, take: 1 },
           }
         : {}),
     };
   }
 
-  private paginate<T extends { id: string }>(items: T[], limit: number) {
+  private paginate<
+    T extends {
+      id: string;
+      _count?: { likes: number; comments: number; reactions?: number };
+      likes?: unknown[];
+      savedBy?: unknown[];
+      reactions?: { emoji: string }[];
+    },
+  >(items: T[], limit: number) {
     const hasMore = items.length > limit;
     const data = hasMore ? items.slice(0, limit) : items;
     return {
       data: data.map((p) => ({
         ...p,
-        liked: 'likes' in p && Array.isArray(p.likes) && p.likes.length > 0,
-        saved:
-          'savedBy' in p && Array.isArray(p.savedBy) && p.savedBy.length > 0,
+        liked: Array.isArray(p.likes) && p.likes.length > 0,
+        saved: Array.isArray(p.savedBy) && p.savedBy.length > 0,
+        reaction: p.reactions?.[0]?.emoji ?? null,
+        reactionCount: p._count?.reactions ?? 0,
       })),
       nextCursor: hasMore ? data[data.length - 1]?.id : null,
     };

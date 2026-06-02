@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { BeanScoreAction, NotificationType } from '@prisma/client';
+import { BeanScoreService } from '../beanscore/beanscore.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -8,6 +9,7 @@ export class LikesService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private beanScore: BeanScoreService,
   ) {}
 
   async togglePost(userId: string, postId: string) {
@@ -30,6 +32,11 @@ export class LikesService {
         entityType: 'post',
         entityId: postId,
       });
+      await this.beanScore.award(
+        post.authorId,
+        BeanScoreAction.LIKE_RECEIVED,
+        `${postId}:${userId}`,
+      );
     }
     return { liked: true };
   }

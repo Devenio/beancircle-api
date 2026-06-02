@@ -6,7 +6,7 @@ import {
   NotFoundException,
   forwardRef,
 } from '@nestjs/common';
-import { MessageType, NotificationType } from '@prisma/client';
+import { MessageType, NotificationType, ReactionEmoji } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -124,6 +124,7 @@ export class ChatService {
         sender: {
           select: { id: true, username: true, name: true, avatarUrl: true },
         },
+        reactions: true,
       },
     });
     const hasMore = items.length > limit;
@@ -209,8 +210,24 @@ export class ChatService {
       deletedAt: message.deletedAt ?? undefined,
       pinned: message.isPinned,
       seenBy: message.seenBy,
+      reactions:
+        'reactions' in message && Array.isArray(message.reactions)
+          ? this.groupReactions(
+              message.reactions as { emoji: ReactionEmoji; userId: string }[],
+            )
+          : [],
       createdAt: message.createdAt,
     };
+  }
+
+  private groupReactions(
+    reactions: { emoji: ReactionEmoji; userId: string }[],
+  ) {
+    const map = new Map<ReactionEmoji, number>();
+    for (const r of reactions) {
+      map.set(r.emoji, (map.get(r.emoji) ?? 0) + 1);
+    }
+    return [...map.entries()].map(([emoji, count]) => ({ emoji, count }));
   }
 
   async sendMessage(
@@ -444,6 +461,49 @@ export class ChatService {
       message: payload,
     });
     return { seen: true, message: payload };
+  }
+
+  async toggleMessageReaction(
+    conversationId: string,
+    messageId: string,
+    userId: string,
+    emoji: ReactionEmoji,
+  ) {
+    await this.ensureMember(conversationId, userId);
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+    if (!message || message.conversationId !== conversationId) {
+      throw new NotFoundException('Message not found');
+    }
+
+    const existing = await this.prisma.messageReaction.findUnique({
+      where: {
+        messageId_userId_emoji: { messageId, userId, emoji },
+      },
+    });
+    if (existing) {
+      await this.prisma.messageReaction.delete({ where: { id: existing.id } });
+    } else {
+      await this.prisma.messageReaction.create({
+        data: { messageId, userId, emoji },
+      });
+    }
+
+    const reactions = await this.prisma.messageReaction.findMany({
+      where: { messageId },
+    });
+    const payload = {
+      conversationId,
+      messageId,
+      reactions: this.groupReactions(reactions),
+    };
+    this.realtime.emitToConversation(
+      conversationId,
+      'message:reaction',
+      payload,
+    );
+    return payload;
   }
 
   private async ensureMember(conversationId: string, userId: string) {
