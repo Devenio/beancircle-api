@@ -6,7 +6,19 @@ import { UploadsService } from './uploads.service';
 
 class PresignDto {
   @IsString()
-  @IsIn(['image/jpeg', 'image/png', 'image/webp', 'video/mp4'])
+  @IsIn([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+    'audio/webm',
+    'audio/mpeg',
+    'audio/mp4',
+    'audio/ogg',
+  ])
   contentType: string;
 
   @IsString()

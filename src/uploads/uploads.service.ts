@@ -8,7 +8,14 @@ const MIME_MAX_BYTES: Record<string, number> = {
   'image/jpeg': 10 * 1024 * 1024,
   'image/png': 10 * 1024 * 1024,
   'image/webp': 10 * 1024 * 1024,
+  'image/gif': 10 * 1024 * 1024,
   'video/mp4': 50 * 1024 * 1024,
+  'video/webm': 50 * 1024 * 1024,
+  'video/quicktime': 50 * 1024 * 1024,
+  'audio/webm': 16 * 1024 * 1024,
+  'audio/mpeg': 16 * 1024 * 1024,
+  'audio/mp4': 16 * 1024 * 1024,
+  'audio/ogg': 16 * 1024 * 1024,
 };
 
 const ALLOWED_FOLDERS = new Set(['avatars', 'posts', 'reviews', 'messages']);
@@ -43,11 +50,13 @@ export class UploadsService {
       throw new BadRequestException('Unsupported content type');
     }
     const key = `${folder}/${userId}/${uuid()}`;
+    // NOTE: do not bind Content-Length into the signature — the client uploads
+    // its real file size, which would never equal `maxBytes`. `maxBytes` is
+    // only returned so the client can validate before uploading.
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
       ContentType: contentType,
-      ContentLength: maxBytes,
     });
     const expiresIn = 600;
     const uploadUrl = getSignedUrl(this.s3, command, { expiresIn });

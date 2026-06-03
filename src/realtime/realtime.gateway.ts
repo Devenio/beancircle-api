@@ -176,14 +176,27 @@ export class RealtimeGateway
   @SubscribeMessage('message:read')
   async handleRead(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
+    @MessageBody()
+    data: { conversationId: string; lastMessageId?: string },
   ) {
     const userId = getSocketData(client).userId;
-    if (!userId) return;
-    await this.chatService.markRead(data.conversationId, userId);
+    if (!userId || !data?.conversationId) return;
+    const result = await this.chatService.markRead(
+      data.conversationId,
+      userId,
+      data.lastMessageId,
+    );
+    // Tell the peer their messages were read (for seen receipts)...
     this.emitToConversation(data.conversationId, 'message:read', {
       userId,
       conversationId: data.conversationId,
+      lastReadMessageId: result.lastReadMessageId,
+      lastReadAt: result.lastReadAt,
+    });
+    // ...and tell the reader's own devices to clear unread for this thread.
+    this.emitToUser(userId, 'conversation:read', {
+      conversationId: data.conversationId,
+      lastReadMessageId: result.lastReadMessageId,
     });
   }
 }
