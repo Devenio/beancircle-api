@@ -80,6 +80,47 @@ export class RealtimeGateway
     this.server.to(`conversation:${conversationId}`).emit(event, data);
   }
 
+  emitToSquad(squadId: string, event: string, data: unknown) {
+    this.server.to(`squad:${squadId}`).emit(event, data);
+  }
+
+  @SubscribeMessage('squad:join')
+  async joinSquad(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() squadId: string,
+  ) {
+    const userId = getSocketData(client).userId;
+    if (!userId || !squadId) return;
+    const member = await this.prisma.squadMember.findUnique({
+      where: { squadId_userId: { squadId, userId } },
+      select: { id: true },
+    });
+    if (member) await client.join(`squad:${squadId}`);
+  }
+
+  @SubscribeMessage('squad:leave')
+  async leaveSquad(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() squadId: string,
+  ) {
+    await client.leave(`squad:${squadId}`);
+  }
+
+  @SubscribeMessage('squad:typing')
+  squadTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { squadId: string; typing?: boolean },
+  ) {
+    const socketData = getSocketData(client);
+    if (!socketData.userId || !data.squadId) return;
+    client.to(`squad:${data.squadId}`).emit('squad:typing', {
+      userId: socketData.userId,
+      username: socketData.username,
+      squadId: data.squadId,
+      typing: data.typing ?? true,
+    });
+  }
+
   @SubscribeMessage('conversation:join')
   async joinConversation(
     @ConnectedSocket() client: Socket,

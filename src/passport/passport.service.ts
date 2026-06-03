@@ -4,10 +4,22 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { BadgeCode, BeanScoreAction, CheckinSource, PostType } from '@prisma/client';
+import {
+  ActivityType,
+  BadgeCode,
+  BeanScoreAction,
+  CheckinSource,
+  NotificationType,
+  PostType,
+  StreakType,
+} from '@prisma/client';
+import { ActivityService } from '../activity/activity.service';
 import { BeanScoreService } from '../beanscore/beanscore.service';
 import { ChallengesService } from '../challenges/challenges.service';
+import { CollectiblesService } from '../collectibles/collectibles.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StreakService } from '../streaks/streaks.service';
 import { PassportCheckinDto } from './dto/passport-checkin.dto';
 
 const DAILY_CHECKIN_LIMIT = 10;
@@ -20,6 +32,10 @@ export class PassportService implements OnModuleInit {
     private prisma: PrismaService,
     private beanScore: BeanScoreService,
     private challenges: ChallengesService,
+    private streaks: StreakService,
+    private collectibles: CollectiblesService,
+    private activity: ActivityService,
+    private notifications: NotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -255,6 +271,9 @@ export class PassportService implements OnModuleInit {
           cityId: cafe.cityId,
           countryId: cafe.countryId,
           source,
+          mood: dto.mood ?? null,
+          status: dto.status ?? null,
+          withUserIds: dto.withUserIds ?? [],
         },
         include: {
           cafe: { include: { photos: { take: 1 } } },
@@ -330,6 +349,62 @@ export class PassportService implements OnModuleInit {
       cafe.id,
     );
 
+    // Streak engine: extend consecutive + weekly streaks.
+    const [consecutive, weekly] = await Promise.all([
+      this.streaks.touch(userId, StreakType.CONSECUTIVE_CHECKIN),
+      this.streaks.touch(userId, StreakType.WEEKLY_CAFE),
+    ]);
+    const streakMilestone = consecutive.milestone ?? weekly.milestone ?? null;
+
+    // Collectible card for this cafe.
+    const collectible = await this.collectibles.grantForCafe(
+      userId,
+      cafe.id,
+      result.checkin.id,
+    );
+
+    // Activity feed records (friends + collectibles + badges + streaks).
+    await this.activity.record({
+      actorId: userId,
+      type: ActivityType.FRIEND_CHECKIN,
+      cafeId: cafe.id,
+      checkinId: result.checkin.id,
+      cityId: cafe.cityId,
+      payload: {
+        mood: dto.mood ?? null,
+        status: dto.status ?? null,
+        withCount: dto.withUserIds?.length ?? 0,
+      },
+    });
+    if (collectible.isNew) {
+      await this.activity.record({
+        actorId: userId,
+        type: ActivityType.FRIEND_COLLECTED_CARD,
+        cafeId: cafe.id,
+        cityId: cafe.cityId,
+        payload: { rarity: collectible.card.rarity, cardName: collectible.card.name },
+      });
+    }
+    for (const b of earnedBadges) {
+      await this.activity.record({
+        actorId: userId,
+        type: ActivityType.FRIEND_EARNED_BADGE,
+        badgeCode: b.badgeCode,
+        cityId: cafe.cityId,
+      });
+    }
+    if (streakMilestone) {
+      await this.activity.record({
+        actorId: userId,
+        type: ActivityType.FRIEND_STREAK_MILESTONE,
+        cityId: cafe.cityId,
+        payload: { milestone: streakMilestone },
+      });
+    }
+
+    // Notify followers that a friend just checked in (capped fan-out).
+    await this.notifyFollowersOfCheckin(userId, cafe.id, cafe.name);
+
     return {
       checkin: result.checkin,
       stamp: result.stamp,
@@ -337,7 +412,34 @@ export class PassportService implements OnModuleInit {
       passport: updatedPassport,
       earnedBadges,
       unlockedRewards,
+      collectible: collectible.isNew ? collectible.card : null,
+      streaks: { consecutive, weekly, milestone: streakMilestone },
     };
+  }
+
+  private async notifyFollowersOfCheckin(
+    actorId: string,
+    cafeId: string,
+    cafeName: string,
+  ) {
+    const followers = await this.prisma.userFollow.findMany({
+      where: { followingId: actorId },
+      select: { followerId: true },
+      take: 50,
+      orderBy: { createdAt: 'desc' },
+    });
+    await Promise.all(
+      followers.map((f) =>
+        this.notifications.create({
+          userId: f.followerId,
+          type: NotificationType.FRIEND_CHECKIN,
+          actorId,
+          entityType: 'cafe',
+          entityId: cafeId,
+          payload: { cafeName },
+        }),
+      ),
+    );
   }
 
   private async evaluateBadges(userId: string, passport: { totalStamps: number; totalCheckins: number }) {

@@ -2,8 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
+import { CollectiblesModule } from './collectibles/collectibles.module';
+import { SquadsModule } from './squads/squads.module';
+import { StreaksModule } from './streaks/streaks.module';
 import { CafesModule } from './cafes/cafes.module';
 import { ChatModule } from './chat/chat.module';
 import { CheckinsModule } from './checkins/checkins.module';
@@ -39,6 +43,10 @@ import { UsersModule } from './users/users.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     PrismaModule,
     RedisModule,
+    ActivityModule,
+    StreaksModule,
+    CollectiblesModule,
+    SquadsModule,
     AuthModule,
     UsersModule,
     CafesModule,

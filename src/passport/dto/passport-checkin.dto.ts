@@ -1,4 +1,14 @@
-import { IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class PassportCheckinDto {
   @IsOptional()
@@ -20,4 +30,20 @@ export class PassportCheckinDto {
   @Min(-180)
   @Max(180)
   lng?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  mood?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  status?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID('all', { each: true })
+  withUserIds?: string[];
 }

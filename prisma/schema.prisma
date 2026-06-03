@@ -40,6 +40,12 @@ enum NotificationType {
   NEW_LIKE
   NEW_MESSAGE
   GIFT_COFFEE
+  FRIEND_CHECKIN
+  FRIEND_JOINED_EVENT
+  EVENT_STARTING_SOON
+  SQUAD_INVITATION
+  SQUAD_MESSAGE
+  STREAK_MILESTONE
 }
 
 enum GiftStatus {
@@ -113,6 +119,61 @@ enum ReactionEmoji {
   CLAP
 }
 
+enum ActivityType {
+  FRIEND_CHECKIN
+  FRIEND_JOINED_EVENT
+  FRIEND_EARNED_BADGE
+  FRIEND_COMPLETED_CHALLENGE
+  FRIEND_JOINED_SQUAD
+  FRIEND_STREAK_MILESTONE
+  FRIEND_COLLECTED_CARD
+  CAFE_TRENDING
+  EVENT_ANNOUNCED
+  SQUAD_ACTIVITY
+}
+
+enum EventType {
+  OPEN_MIC
+  GAME_NIGHT
+  STUDY_GROUP
+  STARTUP_MEETUP
+  MUSIC_NIGHT
+  COFFEE_WORKSHOP
+  BOOK_CLUB
+  OTHER
+}
+
+enum SquadCategory {
+  GAMERS
+  COFFEE_LOVERS
+  ARTISTS
+  STUDENTS
+  DEVELOPERS
+  BOOK_CLUB
+  OTHER
+}
+
+enum SquadRole {
+  MEMBER
+  ADMIN
+  OWNER
+}
+
+enum CardRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum StreakType {
+  DAILY_VISIT
+  WEEKLY_CAFE
+  CONSECUTIVE_CHECKIN
+  EVENT_PARTICIPATION
+}
+
 model Country {
   id     String @id @default(uuid())
   code   String @unique
@@ -124,6 +185,7 @@ model Country {
   reviews Review[]
   checkins Checkin[]
   gifts  GiftCoffee[]
+  squads Squad[]
 }
 
 model City {
@@ -141,6 +203,8 @@ model City {
   favoriteCafes FavoriteCafe[]
   challenges CommunityChallenge[]
   events     CommunityEvent[]
+  squads     Squad[]
+  activities FriendActivity[]
 
   @@unique([countryId, slug])
 }
@@ -203,6 +267,14 @@ model User {
   referralAsReferred Referral?
   referredBy         User?      @relation("UserReferrals", fields: [referredById], references: [id])
   usersReferred      User[]     @relation("UserReferrals")
+  friendActivities   FriendActivity[]
+  squadMemberships   SquadMember[]
+  squadMessages      SquadMessage[]
+  squadsCreated      Squad[]    @relation("SquadCreator")
+  collectibles       UserCollectible[]
+  streaks            UserStreak[]
+  eventReminders     EventReminder[]
+  eventsHosted       CommunityEvent[] @relation("EventHost")
 }
 
 model Referral {
@@ -280,6 +352,9 @@ model Cafe {
   workReports        WorkReport[]
   owners             CafeOwner[]
   events             CommunityEvent[]
+  squads             Squad[]
+  collectibleCard    CollectibleCard?
+  activities         FriendActivity[]
 
   @@index([cityId])
   @@index([cityId, avgRating])
@@ -426,6 +501,9 @@ model Checkin {
   cityId    String
   countryId String
   source    CheckinSource @default(APP)
+  mood      String?
+  status    String?
+  withUserIds String[]    @default([])
   createdAt DateTime      @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -723,22 +801,29 @@ model ChallengeParticipation {
 }
 
 model CommunityEvent {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   title         String
   description   String
+  type          EventType @default(OTHER)
   cafeId        String?
   cityId        String?
+  hostId        String?
+  capacity      Int?
   locationLabel String?
   coverUrl      String?
   startsAt      DateTime
   endsAt        DateTime
-  createdAt     DateTime @default(now())
-  cafe          Cafe?    @relation(fields: [cafeId], references: [id], onDelete: SetNull)
-  city          City?    @relation(fields: [cityId], references: [id])
+  createdAt     DateTime  @default(now())
+  cafe          Cafe?     @relation(fields: [cafeId], references: [id], onDelete: SetNull)
+  city          City?     @relation(fields: [cityId], references: [id])
+  host          User?     @relation("EventHost", fields: [hostId], references: [id], onDelete: SetNull)
   rsvps         EventRsvp[]
+  reminders     EventReminder[]
+  activities    FriendActivity[]
 
   @@index([startsAt])
   @@index([cityId, startsAt])
+  @@index([type, startsAt])
 }
 
 model EventRsvp {
@@ -766,4 +851,144 @@ model Report {
 
   @@index([reporterId, createdAt])
   @@index([status, createdAt])
+}
+
+model FriendActivity {
+  id         String       @id @default(uuid())
+  actorId    String
+  type       ActivityType
+  cafeId     String?
+  eventId    String?
+  squadId    String?
+  badgeCode  BadgeCode?
+  checkinId  String?
+  cityId     String?
+  cheerCount Int          @default(0)
+  payload    Json?
+  createdAt  DateTime     @default(now())
+
+  actor User            @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  cafe  Cafe?           @relation(fields: [cafeId], references: [id], onDelete: SetNull)
+  event CommunityEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  squad Squad?          @relation(fields: [squadId], references: [id], onDelete: SetNull)
+  city  City?           @relation(fields: [cityId], references: [id])
+
+  @@index([actorId, createdAt])
+  @@index([type, createdAt])
+  @@index([cityId, createdAt])
+  @@index([createdAt])
+}
+
+model Squad {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  description String?
+  category    SquadCategory @default(OTHER)
+  cafeId      String?
+  cityId      String?
+  countryId   String?
+  coverUrl    String?
+  emoji       String?
+  isPublic    Boolean       @default(true)
+  memberCount Int           @default(0)
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  cafe       Cafe?    @relation(fields: [cafeId], references: [id], onDelete: SetNull)
+  city       City?    @relation(fields: [cityId], references: [id])
+  country    Country? @relation(fields: [countryId], references: [id])
+  createdBy  User?    @relation("SquadCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members    SquadMember[]
+  messages   SquadMessage[]
+  activities FriendActivity[]
+
+  @@index([cafeId])
+  @@index([cityId, memberCount])
+  @@index([category])
+}
+
+model SquadMember {
+  id         String    @id @default(uuid())
+  squadId    String
+  userId     String
+  role       SquadRole @default(MEMBER)
+  points     Int       @default(0)
+  joinedAt   DateTime  @default(now())
+  lastReadAt DateTime?
+  squad      Squad     @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([squadId, userId])
+  @@index([userId])
+  @@index([squadId, points])
+}
+
+model SquadMessage {
+  id        String   @id @default(uuid())
+  squadId   String
+  senderId  String
+  body      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  squad     Squad    @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([squadId, createdAt])
+}
+
+model CollectibleCard {
+  id          String     @id @default(uuid())
+  cafeId      String     @unique
+  name        String
+  artworkUrl  String?
+  rarity      CardRarity @default(COMMON)
+  description String?
+  createdAt   DateTime   @default(now())
+  cafe        Cafe       @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  collectedBy UserCollectible[]
+
+  @@index([rarity])
+}
+
+model UserCollectible {
+  id          String   @id @default(uuid())
+  userId      String
+  cardId      String
+  checkinId   String?
+  collectedAt DateTime @default(now())
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card        CollectibleCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@index([userId, collectedAt])
+}
+
+model UserStreak {
+  id          String     @id @default(uuid())
+  userId      String
+  type        StreakType
+  current     Int        @default(0)
+  best        Int        @default(0)
+  lastEventOn DateTime?
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+}
+
+model EventReminder {
+  id        String    @id @default(uuid())
+  userId    String
+  eventId   String
+  remindAt  DateTime
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     CommunityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([remindAt, sentAt])
 }
