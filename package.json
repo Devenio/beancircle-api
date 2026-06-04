@@ -23,7 +23,9 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "smoke": "bash scripts/smoke-test.sh",
     "dev:local": "bash scripts/dev-local.sh",
-    "dev:local:setup": "bash scripts/dev-local.sh --setup"
+    "dev:local:setup": "bash scripts/dev-local.sh --setup",
+    "dev:local:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-local.ps1",
+    "dev:local:win:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-local.ps1 -Setup"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1057.0",

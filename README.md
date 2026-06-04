@@ -26,6 +26,26 @@ npm run dev:local               # later runs
 
 App: `http://localhost:3000/fa` · API: `http://localhost:3001/api/v1`
 
+### WSL with repo on `C:` (`/mnt/c/...`)
+
+`npm install` on `/mnt/c` often fails for native modules (`bcrypt`, `ENOTDIR`). The bash script auto-runs the Windows PowerShell path instead (requires **Node 20+ on Windows PATH**, not only WSL nvm). You can also run explicitly:
+
+```powershell
+# From PowerShell in beancircle-api
+npm run dev:local:win:setup
+npm run dev:local:win
+```
+
+Or from WSL (same as `dev:local:setup` — delegates automatically):
+
+```bash
+npm run dev:local:setup
+```
+
+To force WSL npm anyway (not recommended on `/mnt/c`): `BEANCIRCLE_FORCE_WSL=1 npm run dev:local:setup`
+
+Docker Postgres is published on **host port 5434** (not 5433) so it does not clash with a local PostgreSQL installation on Windows, which often already uses 5433.
+
 **Manual setup:**
 
 ```bash

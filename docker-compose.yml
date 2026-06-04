@@ -5,8 +5,9 @@ services:
       POSTGRES_USER: beancircle
       POSTGRES_PASSWORD: beancircle
       POSTGRES_DB: beancircle
+    # Host 5434 avoids conflict with a local PostgreSQL often bound to 5433 on Windows.
     ports:
-      - '5433:5432'
+      - '5434:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
 

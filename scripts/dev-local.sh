@@ -28,7 +28,7 @@ Options:
   -h, --help
 
 Services:
-  PostgreSQL  localhost:5433
+  PostgreSQL  localhost:5434
   Redis       localhost:6379
   MinIO       localhost:9000 (console :9001)
   API         http://localhost:3001/api/v1
@@ -54,6 +54,35 @@ done
 
 log() {
   printf '[dev-local] %s\n' "$*"
+}
+
+# npm on /mnt/c (WSL + Windows NTFS) breaks native modules (bcrypt ENOTDIR).
+is_windows_mount_path() {
+  [[ "$1" == /mnt/?/* ]]
+}
+
+maybe_delegate_to_windows() {
+  if [[ -n "${BEANCIRCLE_FORCE_WSL:-}" ]]; then
+    return 1
+  fi
+  if ! is_windows_mount_path "$API_DIR"; then
+    return 1
+  fi
+  if ! command -v powershell.exe >/dev/null 2>&1 && ! command -v pwsh.exe >/dev/null 2>&1; then
+    log "error: repo is on Windows drive ($API_DIR) but PowerShell was not found."
+    log "Run from Windows: npm run dev:local:win:setup"
+    log "Or clone under WSL home (~/beancircle-api), not /mnt/c."
+    exit 1
+  fi
+  local ps1 win_args=() pshell=powershell.exe
+  if ! command -v powershell.exe >/dev/null 2>&1; then
+    pshell=pwsh.exe
+  fi
+  ps1="$(wslpath -w "$SCRIPT_DIR/dev-local.ps1")"
+  log "Windows mount detected — using PowerShell (NTFS-safe npm/pnpm)..."
+  [[ "$SETUP" == true ]] && win_args+=(-Setup)
+  [[ "$SEED" == true && "$SETUP" != true ]] && win_args+=(-Seed)
+  exec "$pshell" -NoProfile -ExecutionPolicy Bypass -File "$ps1" "${win_args[@]}"
 }
 
 load_nvm() {
@@ -89,14 +118,35 @@ require_node() {
   fi
 }
 
+sync_database_url_port() {
+  local env_file="$API_DIR/.env"
+  [[ -f "$env_file" ]] || return 0
+  if grep -qE ':5433/' "$env_file" 2>/dev/null; then
+    log "updating DATABASE_URL port 5433 -> 5434 (docker-compose publishes postgres on 5434; 5433 is often local PostgreSQL on Windows)"
+    sed -i.bak -E 's/:5433\//:5434\//g' "$env_file"
+    rm -f "${env_file}.bak"
+  fi
+}
+
 ensure_env_files() {
   if [[ ! -f "$API_DIR/.env" ]]; then
     cp "$API_DIR/.env.example" "$API_DIR/.env"
     log "created api/.env from .env.example"
   fi
+  if [[ "$SETUP" == true ]]; then
+    sync_database_url_port
+  fi
   if [[ ! -f "$FRONT_DIR/.env.local" ]]; then
-    cp "$FRONT_DIR/.env.local.example" "$FRONT_DIR/.env.local"
-    log "created front/.env.local from .env.local.example"
+    if [[ -f "$FRONT_DIR/.env.local.example" ]]; then
+      cp "$FRONT_DIR/.env.local.example" "$FRONT_DIR/.env.local"
+      log "created front/.env.local from .env.local.example"
+    else
+      cat >"$FRONT_DIR/.env.local" <<'EOF'
+NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+NEXT_PUBLIC_WS_URL=http://localhost:3001
+EOF
+      log "created front/.env.local (defaults; add .env.local.example to the front repo)"
+    fi
   fi
 }
 
@@ -124,6 +174,10 @@ start_infra() {
 prepare_api() {
   cd "$API_DIR"
   if [[ "$SETUP" == true ]] || [[ ! -d node_modules ]]; then
+    if [[ "$SETUP" == true ]] && [[ -d node_modules ]]; then
+      log "removing api/node_modules (clean setup)..."
+      rm -rf node_modules
+    fi
     log "npm install (api)..."
     npm install
   fi
@@ -139,8 +193,18 @@ prepare_api() {
 prepare_front() {
   cd "$FRONT_DIR"
   if [[ "$SETUP" == true ]] || [[ ! -d node_modules ]]; then
-    log "npm install (front)..."
-    npm install
+    if [[ "$SETUP" == true ]] && [[ -d node_modules ]]; then
+      log "removing front/node_modules (clean setup)..."
+      rm -rf node_modules
+    fi
+    log "pnpm install (front)..."
+    corepack enable 2>/dev/null || true
+    if command -v pnpm >/dev/null 2>&1; then
+      pnpm install
+    else
+      log "warning: pnpm not found — falling back to npm install"
+      npm install
+    fi
   fi
 }
 
@@ -162,6 +226,8 @@ if [[ ! -d "$FRONT_DIR" ]]; then
   exit 1
 fi
 
+maybe_delegate_to_windows
+
 load_nvm
 require_node
 ensure_env_files
@@ -177,7 +243,15 @@ echo
 (cd "$API_DIR" && npm run start:dev 2>&1 | sed 's/^/[api]    /') &
 PIDS+=($!)
 
-(cd "$FRONT_DIR" && npm run dev 2>&1 | sed 's/^/[front]  /') &
+(
+  cd "$FRONT_DIR"
+  corepack enable 2>/dev/null || true
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm run dev
+  else
+    npm run dev
+  fi
+) 2>&1 | sed 's/^/[front]  /' &
 PIDS+=($!)
 
 wait -n || true
