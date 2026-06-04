@@ -304,4 +304,36 @@ export class ChatController {
       dto.targetConversationIds,
     );
   }
+
+  @Delete('conversations/:id/messages')
+  clearHistory(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.chatService.clearChatHistory(id, user.id);
+  }
+
+  @Get('conversations/:id/profile')
+  conversationProfile(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.chatService.getConversationProfile(id, user.id);
+  }
+
+  @Get('conversations/:id/shared')
+  sharedContent(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Query('type') type: 'media' | 'files' | 'links' | 'groups',
+    @Query() q: PaginationDto,
+  ) {
+    return this.chatService.getConversationShared(
+      id,
+      user.id,
+      type,
+      q.cursor,
+      q.limit,
+    );
+  }
 }

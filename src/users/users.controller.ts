@@ -79,4 +79,28 @@ export class UsersController {
   ) {
     return this.usersService.unfollow(user.id, id);
   }
+
+  @Get(':id/presence')
+  getPresence(
+    @Param('id') id: string,
+    @CurrentUser() user?: { id: string },
+  ) {
+    return this.usersService.getPresence(id, user?.id);
+  }
+
+  @Post(':id/block')
+  blockUser(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.blockUser(user.id, id);
+  }
+
+  @Delete(':id/block')
+  unblockUser(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.unblockUser(user.id, id);
+  }
 }

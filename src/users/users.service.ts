@@ -1,12 +1,14 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RedisService } from '../redis/redis.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 const userSelect = {
@@ -30,6 +32,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private redis: RedisService,
   ) {}
 
   getMe(userId: string) {
@@ -163,5 +166,58 @@ export class UsersService {
       include: { country: true },
       orderBy: { name: 'asc' },
     });
+  }
+
+  async getPresence(targetUserId: string, viewerId?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, lastSeenAt: true, showLastSeen: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const online = await this.redis.isOnline(targetUserId);
+    const isSelf = viewerId === targetUserId;
+
+    if (!user.showLastSeen && !isSelf) {
+      return { userId: targetUserId, online, lastSeenAt: null, hidden: true };
+    }
+
+    return {
+      userId: targetUserId,
+      online,
+      lastSeenAt: user.lastSeenAt?.toISOString() ?? null,
+      hidden: false,
+    };
+  }
+
+  async blockUser(blockerId: string, blockedId: string) {
+    if (blockerId === blockedId) {
+      throw new BadRequestException('Cannot block yourself');
+    }
+    const target = await this.prisma.user.findUnique({ where: { id: blockedId } });
+    if (!target) throw new NotFoundException('User not found');
+    await this.prisma.userBlock.upsert({
+      where: { blockerId_blockedId: { blockerId, blockedId } },
+      create: { blockerId, blockedId },
+      update: {},
+    });
+    return { blocked: true };
+  }
+
+  async unblockUser(blockerId: string, blockedId: string) {
+    await this.prisma.userBlock.deleteMany({ where: { blockerId, blockedId } });
+    return { blocked: false };
+  }
+
+  async isBlockedEitherWay(userA: string, userB: string) {
+    const block = await this.prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: userA, blockedId: userB },
+          { blockerId: userB, blockedId: userA },
+        ],
+      },
+    });
+    return !!block;
   }
 }

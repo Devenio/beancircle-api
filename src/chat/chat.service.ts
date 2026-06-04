@@ -149,6 +149,15 @@ export class ChatService {
     if (userId === participantId) {
       throw new BadRequestException('Cannot message yourself');
     }
+    const blocked = await this.prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: userId, blockedId: participantId },
+          { blockerId: participantId, blockedId: userId },
+        ],
+      },
+    });
+    if (blocked) throw new ForbiddenException('Cannot message this user');
     const existing = await this.prisma.conversation.findFirst({
       where: {
         AND: [
@@ -306,6 +315,7 @@ export class ChatService {
     data: SendMessageInput,
   ) {
     await this.ensureMember(conversationId, senderId);
+    await this.ensureNotBlocked(conversationId, senderId);
     const messageType = this.parseType(data.type);
     const body = data.body?.trim();
     const hasText = Boolean(body);
@@ -690,5 +700,250 @@ export class ChatService {
   private async ensureMember(conversationId: string, userId: string) {
     const ok = await this.isMember(conversationId, userId);
     if (!ok) throw new NotFoundException('Conversation not found');
+  }
+
+  private async ensureNotBlocked(conversationId: string, senderId: string) {
+    const members = await this.prisma.conversationMember.findMany({
+      where: { conversationId },
+      select: { userId: true },
+    });
+    const peerId = members.find((m) => m.userId !== senderId)?.userId;
+    if (!peerId) return;
+    const blocked = await this.prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: senderId, blockedId: peerId },
+          { blockerId: peerId, blockedId: senderId },
+        ],
+      },
+    });
+    if (blocked) throw new ForbiddenException('Cannot message this user');
+  }
+
+  async clearChatHistory(conversationId: string, userId: string) {
+    await this.ensureMember(conversationId, userId);
+    const now = new Date();
+    await this.prisma.message.updateMany({
+      where: { conversationId, deletedAt: null },
+      data: { deletedAt: now, body: null },
+    });
+    this.realtime.emitToConversation(conversationId, 'conversation:cleared', {
+      conversationId,
+      clearedAt: now.toISOString(),
+    });
+    return { cleared: true };
+  }
+
+  async getConversationProfile(conversationId: string, userId: string) {
+    await this.ensureMember(conversationId, userId);
+    const members = await this.prisma.conversationMember.findMany({
+      where: { conversationId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            bio: true,
+            avatarUrl: true,
+            createdAt: true,
+            lastSeenAt: true,
+            showLastSeen: true,
+          },
+        },
+      },
+    });
+    const peer = members.find((m) => m.userId !== userId)?.user;
+    if (!peer) throw new NotFoundException('Peer not found');
+
+    const [mutualFriends, sharedSquads, mediaCount, filesCount, linksCount, mutedMembership] =
+      await Promise.all([
+        this.countMutualFriends(userId, peer.id),
+        this.countSharedSquads(userId, peer.id),
+        this.prisma.message.count({
+          where: {
+            conversationId,
+            deletedAt: null,
+            type: { in: ['IMAGE', 'VIDEO'] },
+          },
+        }),
+        this.prisma.message.count({
+          where: {
+            conversationId,
+            deletedAt: null,
+            type: 'FILE',
+          },
+        }),
+        this.prisma.message.count({
+          where: {
+            conversationId,
+            deletedAt: null,
+            body: { contains: 'http' },
+          },
+        }),
+        this.prisma.conversationMember.findUnique({
+          where: { conversationId_userId: { conversationId, userId } },
+          select: { muted: true },
+        }),
+      ]);
+
+    return {
+      user: peer,
+      mutualFriendsCount: mutualFriends,
+      sharedGroupsCount: sharedSquads,
+      sharedMediaCount: mediaCount,
+      sharedFilesCount: filesCount,
+      sharedLinksCount: linksCount,
+      muted: mutedMembership?.muted ?? false,
+    };
+  }
+
+  private async countMutualFriends(userA: string, userB: string) {
+    const [aFollows, bFollows] = await Promise.all([
+      this.prisma.userFollow.findMany({
+        where: { followerId: userA },
+        select: { followingId: true },
+      }),
+      this.prisma.userFollow.findMany({
+        where: { followerId: userB },
+        select: { followingId: true },
+      }),
+    ]);
+    const aSet = new Set(aFollows.map((f) => f.followingId));
+    return bFollows.filter((f) => aSet.has(f.followingId)).length;
+  }
+
+  private async countSharedSquads(userA: string, userB: string) {
+    const [aSquads, bSquads] = await Promise.all([
+      this.prisma.squadMember.findMany({
+        where: { userId: userA },
+        select: { squadId: true },
+      }),
+      this.prisma.squadMember.findMany({
+        where: { userId: userB },
+        select: { squadId: true },
+      }),
+    ]);
+    const aSet = new Set(aSquads.map((s) => s.squadId));
+    return bSquads.filter((s) => aSet.has(s.squadId)).length;
+  }
+
+  async getConversationShared(
+    conversationId: string,
+    userId: string,
+    kind: 'media' | 'files' | 'links' | 'groups',
+    cursor?: string,
+    limit = 24,
+  ) {
+    if (!['media', 'files', 'links', 'groups'].includes(kind)) {
+      throw new BadRequestException('Invalid shared content type');
+    }
+    await this.ensureMember(conversationId, userId);
+    const members = await this.prisma.conversationMember.findMany({
+      where: { conversationId },
+      select: { userId: true },
+    });
+    const peerId = members.find((m) => m.userId !== userId)?.userId;
+    if (!peerId) throw new NotFoundException('Peer not found');
+
+    if (kind === 'groups') {
+      const [aSquads, bSquads] = await Promise.all([
+        this.prisma.squadMember.findMany({
+          where: { userId },
+          select: { squadId: true },
+        }),
+        this.prisma.squadMember.findMany({
+          where: { userId: peerId },
+          select: { squadId: true },
+        }),
+      ]);
+      const sharedIds = bSquads
+        .map((s) => s.squadId)
+        .filter((id) => aSquads.some((a) => a.squadId === id));
+      const squads = await this.prisma.squad.findMany({
+        where: { id: { in: sharedIds } },
+        orderBy: { name: 'asc' },
+        take: 50,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          emoji: true,
+          memberCount: true,
+          coverUrl: true,
+        },
+      });
+      return { data: squads, nextCursor: null };
+    }
+
+    const typeFilter =
+      kind === 'media'
+        ? { type: { in: [MessageType.IMAGE, MessageType.VIDEO] as MessageType[] } }
+        : kind === 'files'
+          ? { type: MessageType.FILE }
+          : { body: { contains: 'http' } };
+
+    const items = await this.prisma.message.findMany({
+      where: {
+        conversationId,
+        deletedAt: null,
+        ...typeFilter,
+      },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        body: true,
+        imageUrl: true,
+        attachmentUrl: true,
+        attachmentName: true,
+        attachmentMimeType: true,
+        attachmentSize: true,
+        createdAt: true,
+      },
+    });
+
+    const hasMore = items.length > limit;
+    const page = hasMore ? items.slice(0, limit) : items;
+
+    const data = page
+      .map((msg) => {
+        if (kind === 'links') {
+          const urls = (msg.body ?? '').match(/https?:\/\/[^\s]+/gi) ?? [];
+          return {
+            messageId: msg.id,
+            createdAt: msg.createdAt.toISOString(),
+            url: urls[0] ?? '',
+            label: urls[0] ?? '',
+          };
+        }
+        if (kind === 'media') {
+          const url = msg.imageUrl ?? msg.attachmentUrl ?? '';
+          return {
+            messageId: msg.id,
+            createdAt: msg.createdAt.toISOString(),
+            type: msg.type.toLowerCase(),
+            url,
+            thumbnailUrl: msg.type === MessageType.IMAGE ? url : undefined,
+            name: msg.attachmentName ?? undefined,
+          };
+        }
+        return {
+          messageId: msg.id,
+          createdAt: msg.createdAt.toISOString(),
+          url: msg.attachmentUrl ?? '',
+          name: msg.attachmentName ?? 'File',
+          mimeType: msg.attachmentMimeType ?? undefined,
+          size: msg.attachmentSize ?? undefined,
+        };
+      })
+      .filter((item) => (kind === 'links' ? Boolean(item.url) : kind === 'media' ? Boolean(item.url) : Boolean(item.url)));
+
+    return {
+      data,
+      nextCursor: hasMore ? page[page.length - 1]?.id : null,
+    };
   }
 }

@@ -58,6 +58,10 @@ export class RealtimeGateway
       socketData.username = user?.username ?? null;
       await client.join(`user:${payload.sub}`);
       await this.redis.setOnline(payload.sub);
+      await this.prisma.user.update({
+        where: { id: payload.sub },
+        data: { lastSeenAt: new Date() },
+      });
       this.server.emit('presence', { userId: payload.sub, online: true });
     } catch {
       client.disconnect();
@@ -68,8 +72,24 @@ export class RealtimeGateway
     const userId = getSocketData(client).userId;
     if (userId) {
       await this.redis.setOffline(userId);
-      this.server.emit('presence', { userId, online: false });
+      const lastSeenAt = new Date();
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { lastSeenAt },
+      });
+      this.server.emit('presence', { userId, online: false, lastSeenAt: lastSeenAt.toISOString() });
     }
+  }
+
+  @SubscribeMessage('presence:heartbeat')
+  async handlePresenceHeartbeat(@ConnectedSocket() client: Socket) {
+    const userId = getSocketData(client).userId;
+    if (!userId) return;
+    await this.redis.refreshOnline(userId);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastSeenAt: new Date() },
+    });
   }
 
   emitToUser(userId: string, event: string, data: unknown) {

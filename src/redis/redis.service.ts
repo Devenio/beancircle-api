@@ -27,7 +27,11 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async setOnline(userId: string) {
-    await this.client.setex(`online:${userId}`, 60, '1');
+    await this.client.setex(`online:${userId}`, 90, '1');
+  }
+
+  async refreshOnline(userId: string) {
+    await this.client.expire(`online:${userId}`, 90);
   }
 
   async isOnline(userId: string) {
