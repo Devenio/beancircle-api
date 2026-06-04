@@ -88,6 +88,14 @@ export class UsersController {
     return this.usersService.getPresence(id, user?.id);
   }
 
+  @Get(':id/block-status')
+  getBlockStatus(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.usersService.getBlockStatus(user.id, id);
+  }
+
   @Post(':id/block')
   blockUser(
     @CurrentUser() user: { id: string },

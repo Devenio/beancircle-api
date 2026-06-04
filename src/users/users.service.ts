@@ -220,4 +220,31 @@ export class UsersService {
     });
     return !!block;
   }
+
+  async getBlockStatus(viewerId: string, targetUserId: string) {
+    if (viewerId === targetUserId) {
+      return { blocked: false, blockedByYou: false, blockedByPeer: false };
+    }
+    const target = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!target) throw new NotFoundException('User not found');
+
+    const [byYou, byPeer] = await Promise.all([
+      this.prisma.userBlock.findUnique({
+        where: {
+          blockerId_blockedId: { blockerId: viewerId, blockedId: targetUserId },
+        },
+      }),
+      this.prisma.userBlock.findUnique({
+        where: {
+          blockerId_blockedId: { blockerId: targetUserId, blockedId: viewerId },
+        },
+      }),
+    ]);
+
+    return {
+      blocked: Boolean(byYou || byPeer),
+      blockedByYou: Boolean(byYou),
+      blockedByPeer: Boolean(byPeer),
+    };
+  }
 }
