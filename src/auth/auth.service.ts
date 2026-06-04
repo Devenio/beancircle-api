@@ -6,9 +6,28 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+
+type TokenBundle = {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    phone: string | null;
+    email: string | null;
+    username: string | null;
+    name: string | null;
+    bio: string | null;
+    avatarUrl: string | null;
+    cityId: string | null;
+    countryId: string | null;
+    role: string;
+    city: unknown;
+    needsOnboarding: boolean;
+  };
+};
 
 @Injectable()
 export class AuthService {
@@ -82,7 +101,57 @@ export class AuthService {
     return this.issueTokens(user.id, user.role);
   }
 
+  async createGoogleAuthCode(tokens: TokenBundle) {
+    const code = randomUUID();
+    await this.redis.setAuthCode(code, tokens);
+    return code;
+  }
+
+  async exchangeGoogleCode(code: string) {
+    const tokens = await this.redis.getAuthCode(code);
+    if (!tokens) {
+      throw new UnauthorizedException('Invalid or expired auth code');
+    }
+    await this.redis.delAuthCode(code);
+    return tokens;
+  }
+
   async refresh(refreshToken: string) {
+    const parsed = this.parseRefreshToken(refreshToken);
+    if (!parsed) {
+      return this.refreshLegacy(refreshToken);
+    }
+
+    const record = await this.prisma.refreshToken.findFirst({
+      where: {
+        id: parsed.id,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (!record) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    const valid = await bcrypt.compare(parsed.secret, record.tokenHash);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    await this.prisma.refreshToken.update({
+      where: { id: record.id },
+      data: { revokedAt: new Date() },
+    });
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: record.userId },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    return this.issueTokens(user.id, user.role);
+  }
+
+  private async refreshLegacy(refreshToken: string) {
     const users = await this.prisma.user.findMany({
       where: { refreshTokenHash: { not: null } },
     });
@@ -97,7 +166,21 @@ export class AuthService {
     throw new UnauthorizedException('Invalid refresh token');
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, refreshToken?: string) {
+    if (refreshToken) {
+      const parsed = this.parseRefreshToken(refreshToken);
+      if (parsed) {
+        await this.prisma.refreshToken.updateMany({
+          where: { id: parsed.id, userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+    } else {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
     await this.prisma.user.update({
       where: { id: userId },
       data: { refreshTokenHash: null },
@@ -105,14 +188,41 @@ export class AuthService {
     return { message: 'Logged out' };
   }
 
-  private async issueTokens(userId: string, role: string) {
+  private parseRefreshToken(token: string): { id: string; secret: string } | null {
+    const dot = token.indexOf('.');
+    if (dot <= 0) return null;
+    const id = token.slice(0, dot);
+    const secret = token.slice(dot + 1);
+    if (!id || !secret) return null;
+    return { id, secret };
+  }
+
+  private refreshExpiresAt() {
+    const raw = this.config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
+    const days = raw.endsWith('d') ? parseInt(raw, 10) : 7;
+    const ms = (Number.isFinite(days) ? days : 7) * 86_400_000;
+    return new Date(Date.now() + ms);
+  }
+
+  private async issueTokens(userId: string, role: string): Promise<TokenBundle> {
     const payload = { sub: userId, role };
     const accessToken = await this.jwt.signAsync(payload);
-    const refreshToken = randomBytes(32).toString('hex');
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshTokenHash: await bcrypt.hash(refreshToken, 10) },
-    });
+    const secret = randomBytes(32).toString('hex');
+    const tokenId = randomUUID();
+    const refreshToken = `${tokenId}.${secret}`;
+    const tokenHash = await bcrypt.hash(secret, 10);
+    const expiresAt = this.refreshExpiresAt();
+
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.create({
+        data: { id: tokenId, userId, tokenHash, expiresAt },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { refreshTokenHash: null },
+      }),
+    ]);
+
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       include: { city: true, country: true },

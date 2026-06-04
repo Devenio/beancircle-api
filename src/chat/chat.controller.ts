@@ -11,6 +11,9 @@ import {
 import { MessageType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -21,6 +24,7 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -135,6 +139,40 @@ class PinMessageDto {
   pinned?: boolean;
 }
 
+class MessageReactionDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  emoji: string;
+}
+
+class ForwardMessageDto {
+  @IsString()
+  messageId: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  targetConversationIds: string[];
+}
+
+class ConversationPinDto {
+  @IsBoolean()
+  pinned: boolean;
+}
+
+class ConversationMuteDto {
+  @IsBoolean()
+  muted: boolean;
+}
+
+class MarkReadDto {
+  @IsOptional()
+  @IsString()
+  lastMessageId?: string;
+}
+
 @Controller()
 export class ChatController {
   constructor(private chatService: ChatService) {}
@@ -198,6 +236,21 @@ export class ChatController {
     return this.chatService.markMessageSeen(id, messageId, user.id);
   }
 
+  @Post('conversations/:id/messages/:messageId/reactions')
+  react(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Param('messageId') messageId: string,
+    @Body() dto: MessageReactionDto,
+  ) {
+    return this.chatService.toggleMessageReaction(
+      id,
+      messageId,
+      user.id,
+      dto.emoji,
+    );
+  }
+
   @Post('conversations/:id/messages/:messageId/pin')
   pin(
     @CurrentUser() user: { id: string },
@@ -210,6 +263,45 @@ export class ChatController {
       messageId,
       user.id,
       dto.pinned,
+    );
+  }
+
+  @Post('conversations/:id/read')
+  read(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: MarkReadDto,
+  ) {
+    return this.chatService.markRead(id, user.id, dto.lastMessageId);
+  }
+
+  @Post('conversations/:id/pin')
+  pinConversation(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ConversationPinDto,
+  ) {
+    return this.chatService.setConversationPinned(id, user.id, dto.pinned);
+  }
+
+  @Post('conversations/:id/mute')
+  muteConversation(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ConversationMuteDto,
+  ) {
+    return this.chatService.setConversationMuted(id, user.id, dto.muted);
+  }
+
+  @Post('messages/forward')
+  forward(
+    @CurrentUser() user: { id: string },
+    @Body() dto: ForwardMessageDto,
+  ) {
+    return this.chatService.forwardMessage(
+      user.id,
+      dto.messageId,
+      dto.targetConversationIds,
     );
   }
 }

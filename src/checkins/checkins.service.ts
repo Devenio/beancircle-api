@@ -1,48 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { PostType } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PassportService } from '../passport/passport.service';
 
 @Injectable()
 export class CheckinsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private passportService: PassportService,
+  ) {}
 
-  async create(userId: string, cafeId: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-    });
-    const cafe = await this.prisma.cafe.findUniqueOrThrow({
-      where: { id: cafeId },
-    });
-    if (!user.cityId) {
-      throw new BadRequestException('Complete profile with city first');
-    }
-
-    const checkin = await this.prisma.checkin.create({
-      data: {
-        userId,
-        cafeId,
-        cityId: cafe.cityId,
-        countryId: cafe.countryId,
-      },
-      include: {
-        cafe: true,
-        user: { select: { id: true, username: true, name: true, avatarUrl: true } },
-      },
-    });
-
-    await this.prisma.post.create({
-      data: {
-        authorId: userId,
-        cafeId,
-        checkinId: checkin.id,
-        type: PostType.CHECKIN,
-        caption: `${user.name ?? user.username} checked in at ${cafe.name}`,
-        cityId: cafe.cityId,
-        countryId: cafe.countryId,
-      },
-    });
-
-    return checkin;
+  create(userId: string, cafeId: string) {
+    return this.passportService.checkin(userId, { cafeId });
   }
 
   list(userId?: string) {
@@ -51,6 +19,7 @@ export class CheckinsService {
       include: {
         cafe: { include: { photos: { take: 1 } } },
         user: { select: { id: true, username: true, name: true, avatarUrl: true } },
+        stamp: true,
       },
       orderBy: { createdAt: 'desc' },
       take: 50,

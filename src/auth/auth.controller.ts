@@ -8,13 +8,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
+import { GoogleExchangeDto } from './dto/google-exchange.dto';
 import { OtpRequestDto } from './dto/otp-request.dto';
 import { OtpVerifyDto } from './dto/otp-verify.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -24,12 +27,14 @@ export class AuthController {
   ) {}
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 900000 } })
   @Post('otp/request')
   requestOtp(@Body() dto: OtpRequestDto) {
     return this.authService.requestOtp(dto.phone);
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 900000 } })
   @Post('otp/verify')
   verifyOtp(@Body() dto: OtpVerifyDto) {
     return this.authService.verifyOtp(dto.phone, dto.code);
@@ -53,22 +58,28 @@ export class AuthController {
       },
     );
     const front = this.config.get('FRONTEND_URL') ?? 'http://localhost:3000';
-    const params = new URLSearchParams({
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    });
-    res.redirect(`${front}/auth/callback?${params.toString()}`);
+    const code = await this.authService.createGoogleAuthCode(tokens);
+    res.redirect(`${front}/auth/callback?code=${encodeURIComponent(code)}`);
   }
 
   @Public()
+  @Post('google/exchange')
+  exchangeGoogle(@Body() dto: GoogleExchangeDto) {
+    return this.authService.exchangeGoogleCode(dto.code);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('refresh')
-  refresh(@Body('refreshToken') refreshToken: string) {
-    if (!refreshToken) throw new Error('refreshToken required');
-    return this.authService.refresh(refreshToken);
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto.refreshToken);
   }
 
   @Post('logout')
-  logout(@CurrentUser() user: { id: string }) {
-    return this.authService.logout(user.id);
+  logout(
+    @CurrentUser() user: { id: string },
+    @Body() body?: { refreshToken?: string },
+  ) {
+    return this.authService.logout(user.id, body?.refreshToken);
   }
 }

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { CheckinsService } from './checkins.service';
 
 @Controller('checkins')
@@ -9,9 +10,9 @@ export class CheckinsController {
   @Post()
   create(
     @CurrentUser() user: { id: string },
-    @Body('cafeId') cafeId: string,
+    @Body() dto: CreateCheckinDto,
   ) {
-    return this.checkinsService.create(user.id, cafeId);
+    return this.checkinsService.create(user.id, dto.cafeId);
   }
 
   @Get()

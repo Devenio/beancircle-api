@@ -91,14 +91,14 @@ export class UsersService {
     }
     const target = await this.prisma.user.findUnique({ where: { id: followingId } });
     if (!target) throw new NotFoundException('User not found');
+    const existing = await this.prisma.userFollow.findUnique({
+      where: { followerId_followingId: { followerId, followingId } },
+    });
+    if (existing) {
+      return { following: true };
+    }
     await this.prisma.$transaction(async (tx) => {
-      await tx.userFollow.upsert({
-        where: {
-          followerId_followingId: { followerId, followingId },
-        },
-        create: { followerId, followingId },
-        update: {},
-      });
+      await tx.userFollow.create({ data: { followerId, followingId } });
       await tx.user.update({
         where: { id: followerId },
         data: { followingCount: { increment: 1 } },

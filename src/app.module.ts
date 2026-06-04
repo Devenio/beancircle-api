@@ -2,15 +2,31 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
+import { CollectiblesModule } from './collectibles/collectibles.module';
+import { SquadsModule } from './squads/squads.module';
+import { StreaksModule } from './streaks/streaks.module';
 import { CafesModule } from './cafes/cafes.module';
 import { ChatModule } from './chat/chat.module';
 import { CheckinsModule } from './checkins/checkins.module';
 import { CommentsModule } from './comments/comments.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { BeanScoreModule } from './beanscore/beanscore.module';
+import { CommunityModule } from './community/community.module';
+import { DiscoverModule } from './discover/discover.module';
+import { ReactionsModule } from './reactions/reactions.module';
+import { WorkModule } from './work/work.module';
+import { OwnerModule } from './owner/owner.module';
+import { ChallengesModule } from './challenges/challenges.module';
+import { EventsModule } from './events/events.module';
+import { GrowthModule } from './growth/growth.module';
 import { GiftsModule } from './gifts/gifts.module';
+import { HomeModule } from './home/home.module';
+import { PassportModule } from './passport/passport.module';
 import { LikesModule } from './likes/likes.module';
+import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PostsModule } from './posts/posts.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -27,6 +43,10 @@ import { UsersModule } from './users/users.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     PrismaModule,
     RedisModule,
+    ActivityModule,
+    StreaksModule,
+    CollectiblesModule,
+    SquadsModule,
     AuthModule,
     UsersModule,
     CafesModule,
@@ -39,6 +59,18 @@ import { UsersModule } from './users/users.module';
     ChatModule,
     NotificationsModule,
     GiftsModule,
+    HomeModule,
+    PassportModule,
+    DiscoverModule,
+    BeanScoreModule,
+    CommunityModule,
+    ReactionsModule,
+    WorkModule,
+    OwnerModule,
+    ChallengesModule,
+    EventsModule,
+    GrowthModule,
+    ReportsModule,
     AdminModule,
     UploadsModule,
     RealtimeModule,

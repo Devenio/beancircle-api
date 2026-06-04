@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -47,12 +48,14 @@ export class CafesService {
   }
 
   async follow(userId: string, cafeId: string) {
+    const existing = await this.prisma.cafeFollow.findUnique({
+      where: { userId_cafeId: { userId, cafeId } },
+    });
+    if (existing) {
+      return { following: true };
+    }
     await this.prisma.$transaction([
-      this.prisma.cafeFollow.upsert({
-        where: { userId_cafeId: { userId, cafeId } },
-        create: { userId, cafeId },
-        update: {},
-      }),
+      this.prisma.cafeFollow.create({ data: { userId, cafeId } }),
       this.prisma.cafe.update({
         where: { id: cafeId },
         data: { followerCount: { increment: 1 } },
@@ -82,11 +85,44 @@ export class CafesService {
     cityId: string;
     countryId: string;
     isPartner?: boolean;
+    bestCoffee?: boolean;
+    bestWorkspace?: boolean;
+    quiet?: boolean;
+    studyFriendly?: boolean;
+    fastWifi?: boolean;
+    outdoorSeating?: boolean;
+    dateFriendly?: boolean;
+    petFriendly?: boolean;
+    workspaceScore?: number;
   }) {
-    return this.prisma.cafe.create({ data });
+    const checkinCode = data.isPartner
+      ? `BC-${randomBytes(4).toString('hex').toUpperCase()}`
+      : undefined;
+    const claimCode = data.isPartner
+      ? `CLM-${randomBytes(4).toString('hex').toUpperCase()}`
+      : undefined;
+    return this.prisma.cafe.create({
+      data: { ...data, checkinCode, claimCode },
+    });
   }
 
-  update(id: string, data: Partial<{ name: string; address: string; isPartner: boolean }>) {
+  update(
+    id: string,
+    data: Partial<{
+      name: string;
+      address: string;
+      isPartner: boolean;
+      bestCoffee: boolean;
+      bestWorkspace: boolean;
+      quiet: boolean;
+      studyFriendly: boolean;
+      fastWifi: boolean;
+      outdoorSeating: boolean;
+      dateFriendly: boolean;
+      petFriendly: boolean;
+      workspaceScore: number;
+    }>,
+  ) {
     return this.prisma.cafe.update({ where: { id }, data });
   }
 }
