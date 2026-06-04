@@ -35,6 +35,7 @@ import { RedisModule } from './redis/redis.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SearchModule } from './search/search.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { SettingsModule } from './settings/settings.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -49,6 +50,7 @@ import { UsersModule } from './users/users.module';
     SquadsModule,
     AuthModule,
     UsersModule,
+    SettingsModule,
     CafesModule,
     PostsModule,
     CommentsModule,

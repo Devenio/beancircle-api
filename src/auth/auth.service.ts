@@ -9,6 +9,11 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import {
+  requestSessionMeta,
+  type SessionMeta,
+} from '../common/utils/session-meta';
+import { SettingsService } from '../settings/settings.service';
 
 type TokenBundle = {
   accessToken: string;
@@ -38,6 +43,13 @@ export class AuthService {
     private config: ConfigService,
   ) {}
 
+  private sessionFromRequest(req?: {
+    headers?: Record<string, string | string[] | undefined>;
+    ip?: string;
+  }): SessionMeta {
+    return requestSessionMeta(req);
+  }
+
   async requestOtp(phone: string) {
     const code =
       this.config.get('SMS_PROVIDER') === 'mock'
@@ -50,7 +62,11 @@ export class AuthService {
     return { message: 'OTP sent' };
   }
 
-  async verifyOtp(phone: string, code: string) {
+  async verifyOtp(
+    phone: string,
+    code: string,
+    req?: { headers?: Record<string, string | string[] | undefined>; ip?: string },
+  ) {
     const stored = await this.redis.getOtp(phone);
     if (!stored || stored !== code) {
       throw new UnauthorizedException('Invalid OTP');
@@ -61,15 +77,18 @@ export class AuthService {
     if (!user) {
       user = await this.prisma.user.create({ data: { phone } });
     }
-    return this.issueTokens(user.id, user.role);
+    return this.issueTokens(user.id, user.role, this.sessionFromRequest(req));
   }
 
-  async validateGoogleUser(profile: {
-    googleId: string;
-    email?: string;
-    name?: string;
-    avatarUrl?: string;
-  }) {
+  async validateGoogleUser(
+    profile: {
+      googleId: string;
+      email?: string;
+      name?: string;
+      avatarUrl?: string;
+    },
+    req?: { headers?: Record<string, string | string[] | undefined>; ip?: string },
+  ) {
     let user = await this.prisma.user.findUnique({
       where: { googleId: profile.googleId },
     });
@@ -98,7 +117,7 @@ export class AuthService {
         },
       });
     }
-    return this.issueTokens(user.id, user.role);
+    return this.issueTokens(user.id, user.role, this.sessionFromRequest(req));
   }
 
   async createGoogleAuthCode(tokens: TokenBundle) {
@@ -116,7 +135,10 @@ export class AuthService {
     return tokens;
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(
+    refreshToken: string,
+    req?: { headers?: Record<string, string | string[] | undefined>; ip?: string },
+  ) {
     const parsed = this.parseRefreshToken(refreshToken);
     if (!parsed) {
       return this.refreshLegacy(refreshToken);
@@ -139,7 +161,7 @@ export class AuthService {
 
     await this.prisma.refreshToken.update({
       where: { id: record.id },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: new Date(), lastUsedAt: new Date() },
     });
 
     const user = await this.prisma.user.findUnique({
@@ -148,7 +170,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-    return this.issueTokens(user.id, user.role);
+    return this.issueTokens(user.id, user.role, this.sessionFromRequest(req));
   }
 
   private async refreshLegacy(refreshToken: string) {
@@ -204,7 +226,11 @@ export class AuthService {
     return new Date(Date.now() + ms);
   }
 
-  private async issueTokens(userId: string, role: string): Promise<TokenBundle> {
+  private async issueTokens(
+    userId: string,
+    role: string,
+    meta?: SessionMeta,
+  ): Promise<TokenBundle> {
     const payload = { sub: userId, role };
     const accessToken = await this.jwt.signAsync(payload);
     const secret = randomBytes(32).toString('hex');
@@ -215,7 +241,13 @@ export class AuthService {
 
     await this.prisma.$transaction([
       this.prisma.refreshToken.create({
-        data: { id: tokenId, userId, tokenHash, expiresAt },
+        data: {
+          id: tokenId,
+          userId,
+          tokenHash,
+          expiresAt,
+          ...SettingsService.refreshTokenSessionPayload(meta),
+        },
       }),
       this.prisma.user.update({
         where: { id: userId },

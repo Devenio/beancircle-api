@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -36,8 +36,8 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 10, ttl: 900000 } })
   @Post('otp/verify')
-  verifyOtp(@Body() dto: OtpVerifyDto) {
-    return this.authService.verifyOtp(dto.phone, dto.code);
+  verifyOtp(@Body() dto: OtpVerifyDto, @Req() req: { headers: Record<string, string | string[] | undefined>; ip?: string }) {
+    return this.authService.verifyOtp(dto.phone, dto.code, req);
   }
 
   @Public()
@@ -48,7 +48,7 @@ export class AuthController {
   @Public()
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  async googleCallback(@Req() req: { user: object }, @Res() res: Response) {
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
     const tokens = await this.authService.validateGoogleUser(
       req.user as {
         googleId: string;
@@ -56,6 +56,7 @@ export class AuthController {
         name?: string;
         avatarUrl?: string;
       },
+      { headers: req.headers, ip: req.ip },
     );
     const front = this.config.get('FRONTEND_URL') ?? 'http://localhost:3000';
     const code = await this.authService.createGoogleAuthCode(tokens);
@@ -71,8 +72,11 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('refresh')
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+  refresh(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: { headers: Record<string, string | string[] | undefined>; ip?: string },
+  ) {
+    return this.authService.refresh(dto.refreshToken, req);
   }
 
   @Post('logout')
