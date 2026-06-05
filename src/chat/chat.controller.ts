@@ -27,6 +27,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { DeleteScopeDto } from './dto/delete-scope.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { ChatService } from './chat.service';
@@ -223,8 +224,14 @@ export class ChatController {
     @CurrentUser() user: { id: string },
     @Param('id') id: string,
     @Param('messageId') messageId: string,
+    @Body() dto: DeleteScopeDto,
   ) {
-    return this.chatService.deleteMessage(id, messageId, user.id);
+    return this.chatService.deleteMessage(
+      id,
+      messageId,
+      user.id,
+      dto.forEveryone ?? false,
+    );
   }
 
   @Post('conversations/:id/messages/:messageId/seen')
@@ -309,8 +316,13 @@ export class ChatController {
   clearHistory(
     @CurrentUser() user: { id: string },
     @Param('id') id: string,
+    @Body() dto: DeleteScopeDto,
   ) {
-    return this.chatService.clearChatHistory(id, user.id);
+    return this.chatService.deleteConversation(
+      id,
+      user.id,
+      dto.forEveryone ?? false,
+    );
   }
 
   @Get('conversations/:id/profile')

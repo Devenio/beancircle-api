@@ -55,7 +55,7 @@ export class ChatService {
 
   async listConversations(userId: string) {
     const memberships = await this.prisma.conversationMember.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       include: {
         conversation: {
           include: {
@@ -167,7 +167,13 @@ export class ChatService {
       },
       include: { members: true },
     });
-    if (existing && existing.members.length === 2) return existing;
+    if (existing && existing.members.length === 2) {
+      await this.prisma.conversationMember.updateMany({
+        where: { conversationId: existing.id, userId, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      return existing;
+    }
 
     return this.prisma.conversation.create({
       data: {
@@ -187,7 +193,10 @@ export class ChatService {
   ) {
     await this.ensureMember(conversationId, userId);
     const items = await this.prisma.message.findMany({
-      where: { conversationId },
+      where: {
+        conversationId,
+        hides: { none: { userId } },
+      },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },
@@ -362,6 +371,10 @@ export class ChatService {
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });
+    await this.prisma.conversationMember.updateMany({
+      where: { conversationId, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    });
     const members = await this.prisma.conversationMember.findMany({
       where: { conversationId, NOT: { userId: senderId } },
     });
@@ -534,6 +547,7 @@ export class ChatService {
     conversationId: string,
     messageId: string,
     userId: string,
+    forEveryone = false,
   ) {
     await this.ensureMember(conversationId, userId);
     const existing = await this.prisma.message.findUnique({
@@ -547,29 +561,43 @@ export class ChatService {
     if (!existing || existing.conversationId !== conversationId) {
       throw new NotFoundException('Message not found');
     }
-    if (existing.senderId !== userId) {
-      throw new ForbiddenException('Cannot delete this message');
+
+    if (forEveryone) {
+      if (existing.senderId !== userId) {
+        throw new ForbiddenException('Only the sender can delete for everyone');
+      }
+
+      const updated = await this.prisma.message.update({
+        where: { id: messageId },
+        data: {
+          body: null,
+          deletedAt: new Date(),
+        },
+        include: {
+          sender: {
+            select: { id: true, username: true, name: true, avatarUrl: true },
+          },
+        },
+      });
+      const payload = this.serializeMessage(updated);
+      this.realtime.emitToConversation(
+        conversationId,
+        'message:deleted',
+        payload,
+      );
+      return payload;
     }
 
-    const updated = await this.prisma.message.update({
-      where: { id: messageId },
-      data: {
-        body: null,
-        deletedAt: new Date(),
-      },
-      include: {
-        sender: {
-          select: { id: true, username: true, name: true, avatarUrl: true },
-        },
-      },
+    await this.prisma.messageHide.upsert({
+      where: { messageId_userId: { messageId, userId } },
+      create: { messageId, userId },
+      update: { hiddenAt: new Date() },
     });
-    const payload = this.serializeMessage(updated);
-    this.realtime.emitToConversation(
+    this.realtime.emitToUser(userId, 'message:hidden', {
       conversationId,
-      'message:deleted',
-      payload,
-    );
-    return payload;
+      messageId,
+    });
+    return { conversationId, messageId, scope: 'me' as const };
   }
 
   async setMessagePinned(
@@ -720,18 +748,40 @@ export class ChatService {
     if (blocked) throw new ForbiddenException('Cannot message this user');
   }
 
-  async clearChatHistory(conversationId: string, userId: string) {
+  async deleteConversation(
+    conversationId: string,
+    userId: string,
+    forEveryone = false,
+  ) {
     await this.ensureMember(conversationId, userId);
-    const now = new Date();
-    await this.prisma.message.updateMany({
-      where: { conversationId, deletedAt: null },
-      data: { deletedAt: now, body: null },
+
+    if (forEveryone) {
+      const now = new Date();
+      await this.prisma.message.updateMany({
+        where: { conversationId, deletedAt: null },
+        data: { deletedAt: now, body: null },
+      });
+      await this.prisma.conversationMember.updateMany({
+        where: { conversationId },
+        data: { deletedAt: now },
+      });
+      this.realtime.emitToConversation(conversationId, 'conversation:deleted', {
+        conversationId,
+        deletedAt: now.toISOString(),
+      });
+      return { conversationId, scope: 'everyone' as const, deleted: true };
+    }
+
+    const deletedAt = new Date();
+    await this.prisma.conversationMember.update({
+      where: { conversationId_userId: { conversationId, userId } },
+      data: { deletedAt },
     });
-    this.realtime.emitToConversation(conversationId, 'conversation:cleared', {
+    this.realtime.emitToUser(userId, 'conversation:hidden', {
       conversationId,
-      clearedAt: now.toISOString(),
+      deletedAt: deletedAt.toISOString(),
     });
-    return { cleared: true };
+    return { conversationId, scope: 'me' as const, deleted: true };
   }
 
   async getConversationProfile(conversationId: string, userId: string) {
