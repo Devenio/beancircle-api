@@ -89,53 +89,15 @@ export class UsersService {
   }
 
   async follow(followerId: string, followingId: string) {
-    if (followerId === followingId) {
-      throw new BadRequestException('Cannot follow yourself');
-    }
-    const target = await this.prisma.user.findUnique({ where: { id: followingId } });
-    if (!target) throw new NotFoundException('User not found');
-    const existing = await this.prisma.userFollow.findUnique({
-      where: { followerId_followingId: { followerId, followingId } },
-    });
-    if (existing) {
-      return { following: true };
-    }
-    await this.prisma.$transaction(async (tx) => {
-      await tx.userFollow.create({ data: { followerId, followingId } });
-      await tx.user.update({
-        where: { id: followerId },
-        data: { followingCount: { increment: 1 } },
-      });
-      await tx.user.update({
-        where: { id: followingId },
-        data: { followersCount: { increment: 1 } },
-      });
-    });
-    await this.notifications.create({
-      userId: followingId,
-      type: NotificationType.NEW_FOLLOWER,
-      actorId: followerId,
-      entityType: 'user',
-      entityId: followerId,
-    });
-    return { following: true };
+    throw new BadRequestException(
+      'Follow is deprecated. Use POST /friends/request instead.',
+    );
   }
 
-  async unfollow(followerId: string, followingId: string) {
-    const deleted = await this.prisma.userFollow.deleteMany({
-      where: { followerId, followingId },
-    });
-    if (deleted.count) {
-      await this.prisma.user.update({
-        where: { id: followerId },
-        data: { followingCount: { decrement: 1 } },
-      });
-      await this.prisma.user.update({
-        where: { id: followingId },
-        data: { followersCount: { decrement: 1 } },
-      });
-    }
-    return { following: false };
+  async unfollow(_followerId: string, _followingId: string) {
+    throw new BadRequestException(
+      'Unfollow is deprecated. Use DELETE /friends/remove instead.',
+    );
   }
 
   async getFavoriteCafes(userId: string) {

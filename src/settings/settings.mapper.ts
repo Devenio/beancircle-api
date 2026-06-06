@@ -1,6 +1,8 @@
 import {
   AutoDownloadMode,
+  DiscoveryVisibility,
   FontSizeLevel,
+  LocationVisibility,
   MediaQualityLevel,
   MessageDensityLevel,
   VisibilityLevel,
@@ -64,4 +66,33 @@ export function toDensity(v: string): MessageDensityLevel {
 
 export function fromDensity(v: MessageDensityLevel): string {
   return v.toLowerCase();
+}
+
+export function toLocationVisibility(v: string): LocationVisibility {
+  const map: Record<string, LocationVisibility> = {
+    exact: LocationVisibility.EXACT,
+    approximate: LocationVisibility.APPROXIMATE,
+    city: LocationVisibility.CITY,
+    hidden: LocationVisibility.HIDDEN,
+  };
+  return map[v] ?? LocationVisibility.APPROXIMATE;
+}
+
+export function fromLocationVisibility(v: LocationVisibility): string {
+  return v.toLowerCase();
+}
+
+export function toDiscoveryVisibility(v: string): DiscoveryVisibility {
+  const map: Record<string, DiscoveryVisibility> = {
+    everyone: DiscoveryVisibility.EVERYONE,
+    friends_of_friends: DiscoveryVisibility.FRIENDS_OF_FRIENDS,
+    hidden: DiscoveryVisibility.HIDDEN,
+  };
+  return map[v] ?? DiscoveryVisibility.EVERYONE;
+}
+
+export function fromDiscoveryVisibility(v: DiscoveryVisibility): string {
+  return v === DiscoveryVisibility.FRIENDS_OF_FRIENDS
+    ? 'friends_of_friends'
+    : v.toLowerCase();
 }

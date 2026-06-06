@@ -23,6 +23,9 @@ export const SETTINGS_RESPONSE_KEYS = [
   'linkPreviews',
   'typingIndicators',
   'autoCleanupDays',
+  'locationVisibility',
+  'discoveryVisibility',
+  'showOnlineStatus',
   'updatedAt',
 ] as const;
 
@@ -52,4 +55,7 @@ export const SETTINGS_DEFAULTS = {
   linkPreviews: true,
   typingIndicators: true,
   autoCleanupDays: 30,
+  locationVisibility: 'approximate',
+  discoveryVisibility: 'everyone',
+  showOnlineStatus: true,
 } as const;

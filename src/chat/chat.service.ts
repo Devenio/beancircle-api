@@ -6,7 +6,9 @@ import {
   NotFoundException,
   forwardRef,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MessageType, NotificationType } from '@prisma/client';
+import { FriendsService } from '../friends/friends.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -38,6 +40,8 @@ type SendMessageInput = {
 export class ChatService {
   constructor(
     private prisma: PrismaService,
+    private config: ConfigService,
+    private friendsService: FriendsService,
     @Inject(forwardRef(() => NotificationsService))
     private notifications: NotificationsService,
     @Inject(forwardRef(() => RealtimeGateway))
@@ -158,6 +162,14 @@ export class ChatService {
       },
     });
     if (blocked) throw new ForbiddenException('Cannot message this user');
+    const allowWithoutFriend =
+      this.config.get<string>('ALLOW_DM_WITHOUT_FRIENDSHIP') === 'true';
+    if (!allowWithoutFriend) {
+      const friends = await this.friendsService.friendshipExists(userId, participantId);
+      if (!friends) {
+        throw new ForbiddenException('Messaging requires friendship');
+      }
+    }
     const existing = await this.prisma.conversation.findFirst({
       where: {
         AND: [

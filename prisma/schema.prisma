@@ -46,6 +46,8 @@ enum NotificationType {
   SQUAD_INVITATION
   SQUAD_MESSAGE
   STREAK_MILESTONE
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
 }
 
 enum GiftStatus {
@@ -75,6 +77,41 @@ enum BadgeCode {
   TEN_CAFES
   TWENTY_CAFES
   WEEKLY_EXPLORER
+  FIRST_FRIEND
+  EXPLORER
+  SOCIAL_BUTTERFLY
+  NETWORK_BUILDER
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+enum LocationVisibility {
+  EXACT
+  APPROXIMATE
+  CITY
+  HIDDEN
+}
+
+enum DiscoveryVisibility {
+  EVERYONE
+  FRIENDS_OF_FRIENDS
+  HIDDEN
+}
+
+enum InterestSlug {
+  COFFEE
+  BUSINESS
+  STARTUPS
+  AI
+  FITNESS
+  MUSIC
+  GAMING
+  TECH
 }
 
 enum RewardType {
@@ -208,6 +245,7 @@ model City {
   events     CommunityEvent[]
   squads     Squad[]
   activities FriendActivity[]
+  userLocations UserLocation[]
 
   @@unique([countryId, slug])
 }
@@ -232,6 +270,7 @@ model User {
   refreshTokenHash String?
   lastSeenAt      DateTime?
   showLastSeen    Boolean   @default(true)
+  dateOfBirth     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -284,6 +323,17 @@ model User {
   eventReminders     EventReminder[]
   eventsHosted       CommunityEvent[] @relation("EventHost")
   settings           UserSettings?
+  location           UserLocation?
+  interests          UserInterest[]
+  sentFriendRequests     FriendRequest[] @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedFriendRequests")
+  friendshipsAsA         Friendship[]    @relation("FriendshipA")
+  friendshipsAsB         Friendship[]    @relation("FriendshipB")
+  suggestedFor           SuggestedConnection[] @relation("SuggestedForUser")
+  suggestedConnections   SuggestedConnection[] @relation("SuggestedTarget")
+  connectionStreak       ConnectionStreak?
+  dailyDiscoveries       DailyDiscovery[] @relation("DailyDiscoverer")
+  discoveredInDaily      DailyDiscovery[] @relation("DailyDiscovered")
 }
 
 enum VisibilityLevel {
@@ -339,6 +389,9 @@ model UserSettings {
   linkPreviews             Boolean             @default(true)
   typingIndicators         Boolean             @default(true)
   autoCleanupDays          Int                 @default(30)
+  locationVisibility       LocationVisibility  @default(APPROXIMATE)
+  discoveryVisibility      DiscoveryVisibility @default(EVERYONE)
+  showOnlineStatus         Boolean             @default(true)
   updatedAt                DateTime            @updatedAt
   user                     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -385,6 +438,90 @@ model UserBlock {
 
   @@unique([blockerId, blockedId])
   @@index([blockedId])
+}
+
+model UserLocation {
+  userId    String   @id
+  latitude  Float
+  longitude Float
+  geohash   String   @db.VarChar(12)
+  cityId    String?
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  city      City?    @relation(fields: [cityId], references: [id])
+
+  @@index([geohash])
+  @@index([cityId, updatedAt])
+}
+
+model UserInterest {
+  userId   String
+  interest InterestSlug
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interest])
+}
+
+model FriendRequest {
+  id          String              @id @default(uuid())
+  senderId    String
+  receiverId  String
+  status      FriendRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  respondedAt DateTime?
+  sender      User                @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User                @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status, createdAt])
+  @@index([senderId, status])
+}
+
+model Friendship {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  createdAt DateTime @default(now())
+  userA     User     @relation("FriendshipA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User     @relation("FriendshipB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model SuggestedConnection {
+  id          String    @id @default(uuid())
+  userId      String
+  suggestedId String
+  score       Float
+  reason      String
+  expiresAt   DateTime
+  dismissedAt DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation("SuggestedForUser", fields: [userId], references: [id], onDelete: Cascade)
+  suggested   User      @relation("SuggestedTarget", fields: [suggestedId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, suggestedId])
+  @@index([userId, score])
+}
+
+model ConnectionStreak {
+  userId         String    @id
+  currentDays    Int       @default(0)
+  longestDays    Int       @default(0)
+  lastActiveDate DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DailyDiscovery {
+  userId       String
+  discoveredId String
+  day          DateTime @db.Date
+  discoverer   User     @relation("DailyDiscoverer", fields: [userId], references: [id], onDelete: Cascade)
+  discovered   User     @relation("DailyDiscovered", fields: [discoveredId], references: [id], onDelete: Cascade)
+
+  @@id([userId, discoveredId, day])
 }
 
 model Cafe {

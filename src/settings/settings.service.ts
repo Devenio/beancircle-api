@@ -6,12 +6,16 @@ import { UpdateSettingsDto } from './dto/update-settings.dto';
 import {
   fromAutoDownload,
   fromDensity,
+  fromDiscoveryVisibility,
   fromFontSize,
+  fromLocationVisibility,
   fromMediaQuality,
   fromVisibilityLevel,
   toAutoDownload,
   toDensity,
+  toDiscoveryVisibility,
   toFontSize,
+  toLocationVisibility,
   toMediaQuality,
   toVisibilityLevel,
 } from './settings.mapper';
@@ -85,6 +89,13 @@ export class SettingsService {
     if (dto.linkPreviews !== undefined) data.linkPreviews = dto.linkPreviews;
     if (dto.typingIndicators !== undefined) data.typingIndicators = dto.typingIndicators;
     if (dto.autoCleanupDays !== undefined) data.autoCleanupDays = dto.autoCleanupDays;
+    if (dto.locationVisibility !== undefined) {
+      data.locationVisibility = toLocationVisibility(dto.locationVisibility);
+    }
+    if (dto.discoveryVisibility !== undefined) {
+      data.discoveryVisibility = toDiscoveryVisibility(dto.discoveryVisibility);
+    }
+    if (dto.showOnlineStatus !== undefined) data.showOnlineStatus = dto.showOnlineStatus;
 
     if (dto.showLastSeen !== undefined) {
       await this.prisma.user.update({
@@ -132,6 +143,9 @@ export class SettingsService {
       linkPreviews: settings.linkPreviews,
       typingIndicators: settings.typingIndicators,
       autoCleanupDays: settings.autoCleanupDays,
+      locationVisibility: fromLocationVisibility(settings.locationVisibility),
+      discoveryVisibility: fromDiscoveryVisibility(settings.discoveryVisibility),
+      showOnlineStatus: settings.showOnlineStatus,
       updatedAt: settings.updatedAt.toISOString(),
     };
   }

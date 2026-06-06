@@ -14,6 +14,8 @@ const autoDownload = ['wifi', 'always', 'never'] as const;
 const mediaQuality = ['standard', 'high'] as const;
 const fontSize = ['small', 'medium', 'large'] as const;
 const density = ['compact', 'comfortable', 'spacious'] as const;
+const locationVisibility = ['exact', 'approximate', 'city', 'hidden'] as const;
+const discoveryVisibility = ['everyone', 'friends_of_friends', 'hidden'] as const;
 
 export class UpdateSettingsDto {
   @IsOptional()
@@ -111,4 +113,16 @@ export class UpdateSettingsDto {
   @Min(7)
   @Max(365)
   autoCleanupDays?: number;
+
+  @IsOptional()
+  @IsIn(locationVisibility)
+  locationVisibility?: (typeof locationVisibility)[number];
+
+  @IsOptional()
+  @IsIn(discoveryVisibility)
+  discoveryVisibility?: (typeof discoveryVisibility)[number];
+
+  @IsOptional()
+  @IsBoolean()
+  showOnlineStatus?: boolean;
 }

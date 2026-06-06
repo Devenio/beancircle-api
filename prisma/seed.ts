@@ -322,6 +322,38 @@ async function main() {
     });
   }
 
+  const ngeohash = require('ngeohash');
+  const baseLat = 35.724;
+  const baseLng = 50.991;
+  for (const [user, offset] of [
+    [demo, 0],
+    [sara, 0.002],
+    [admin, -0.003],
+  ] as const) {
+    const lat = baseLat + offset;
+    const lng = baseLng + offset * 0.5;
+    await prisma.userLocation.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        latitude: lat,
+        longitude: lng,
+        geohash: ngeohash.encode(lat, lng, 7),
+        cityId: fardisId,
+      },
+      update: {
+        latitude: lat,
+        longitude: lng,
+        geohash: ngeohash.encode(lat, lng, 7),
+      },
+    });
+    await prisma.userInterest.upsert({
+      where: { userId_interest: { userId: user.id, interest: 'COFFEE' } },
+      create: { userId: user.id, interest: 'COFFEE' },
+      update: {},
+    });
+  }
+
   console.log('Seed complete:', {
     admin: admin.id,
     demo: demo.id,

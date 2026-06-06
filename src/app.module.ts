@@ -16,6 +16,9 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { BeanScoreModule } from './beanscore/beanscore.module';
 import { CommunityModule } from './community/community.module';
 import { DiscoverModule } from './discover/discover.module';
+import { DiscoverPeopleModule } from './discover-people/discover-people.module';
+import { FriendsModule } from './friends/friends.module';
+import { LocationModule } from './location/location.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { WorkModule } from './work/work.module';
 import { OwnerModule } from './owner/owner.module';
@@ -64,6 +67,9 @@ import { UsersModule } from './users/users.module';
     HomeModule,
     PassportModule,
     DiscoverModule,
+    DiscoverPeopleModule,
+    FriendsModule,
+    LocationModule,
     BeanScoreModule,
     CommunityModule,
     ReactionsModule,

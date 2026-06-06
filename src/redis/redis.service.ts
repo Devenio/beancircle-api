@@ -55,4 +55,52 @@ export class RedisService implements OnModuleDestroy {
   async delAuthCode(code: string) {
     await this.client.del(`authcode:${code}`);
   }
+
+  async tryLocationPing(userId: string, ttlSeconds: number): Promise<boolean> {
+    const key = `loc:ping:${userId}`;
+    const set = await this.client.set(key, '1', 'EX', ttlSeconds, 'NX');
+    return set === 'OK';
+  }
+
+  async geoAddLocation(userId: string, lng: number, lat: number) {
+    await this.client.geoadd('active:locations', lng, lat, userId);
+  }
+
+  async geoRadius(lng: number, lat: number, radiusKm: number, count = 200) {
+    const raw = await this.client.georadius(
+      'active:locations',
+      lng,
+      lat,
+      radiusKm,
+      'km',
+      'WITHDIST',
+      'COUNT',
+      count,
+      'ASC',
+    );
+    return raw as [string, string][];
+  }
+
+  async incrFriendRequestDaily(userId: string): Promise<number> {
+    const key = `friend:req:daily:${userId}:${new Date().toISOString().slice(0, 10)}`;
+    const n = await this.client.incr(key);
+    if (n === 1) await this.client.expire(key, 86400);
+    return n;
+  }
+
+  async friendResendCooldown(senderId: string, receiverId: string): Promise<boolean> {
+    const key = `friend:resend:${senderId}:${receiverId}`;
+    const set = await this.client.set(key, '1', 'EX', 604800, 'NX');
+    return set === 'OK';
+  }
+
+  async getDiscoverCache<T>(key: string): Promise<T | null> {
+    const raw = await this.client.get(`discover:cache:${key}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  }
+
+  async setDiscoverCache(key: string, value: unknown, ttlSeconds = 120) {
+    await this.client.setex(`discover:cache:${key}`, ttlSeconds, JSON.stringify(value));
+  }
 }
