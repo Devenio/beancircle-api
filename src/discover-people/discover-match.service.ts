@@ -57,14 +57,23 @@ export class DiscoverMatchService {
     return 'offline';
   }
 
-  toPublicPerson(c: DiscoverCandidate) {
+  toPublicPerson(c: DiscoverCandidate, radiusKm = 5) {
     const age = computeAge(c.dateOfBirth);
+    const matchReasons: string[] = [];
+    if (c.mutualFriendsCount > 0) {
+      matchReasons.push(`${c.mutualFriendsCount} mutual friends`);
+    }
+    if (c.interests.length > 0) {
+      matchReasons.push(`Shared: ${c.interests.slice(0, 2).join(', ')}`);
+    }
+    if (c.lastActive === 'online') matchReasons.push('Active now');
     return {
       id: c.id,
       name: c.name,
       username: c.username,
       avatarUrl: c.avatarUrl,
       ...(age !== undefined ? { age } : {}),
+      distanceM: Math.round(c.distanceM),
       distanceLabel:
         c.locationVisibility === LocationVisibility.CITY
           ? 'Same city'
@@ -76,6 +85,8 @@ export class DiscoverMatchService {
       sharedGroupsCount: c.sharedGroupsCount,
       lastActive: c.lastActive,
       relationship: c.relationship,
+      matchReasons,
+      score: this.score(c, radiusKm),
     };
   }
 

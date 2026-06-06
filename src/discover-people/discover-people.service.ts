@@ -175,7 +175,7 @@ export class DiscoverPeopleService {
     }
     const page = candidates.slice(start, start + limit);
     const hasMore = start + limit < candidates.length;
-    const items = page.map((c) => this.matchService.toPublicPerson(c));
+    const items = page.map((c) => this.matchService.toPublicPerson(c, radiusKm));
 
     for (const item of page) {
       const today = new Date();
