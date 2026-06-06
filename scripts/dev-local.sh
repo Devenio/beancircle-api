@@ -32,7 +32,7 @@ Services:
   Redis       localhost:6379
   MinIO       localhost:9000 (console :9001)
   API         http://localhost:3001/api/v1
-  Front       http://localhost:3000/fa
+  Front       http://localhost:3000/en
 EOF
 }
 
@@ -63,10 +63,10 @@ is_windows_mount_path() {
 
 maybe_delegate_to_windows() {
   if [[ -n "${BEANCIRCLE_FORCE_WSL:-}" ]]; then
-    return 1
+    return 0
   fi
   if ! is_windows_mount_path "$API_DIR"; then
-    return 1
+    return 0
   fi
   if ! command -v powershell.exe >/dev/null 2>&1 && ! command -v pwsh.exe >/dev/null 2>&1; then
     log "error: repo is on Windows drive ($API_DIR) but PowerShell was not found."
@@ -133,9 +133,7 @@ ensure_env_files() {
     cp "$API_DIR/.env.example" "$API_DIR/.env"
     log "created api/.env from .env.example"
   fi
-  if [[ "$SETUP" == true ]]; then
-    sync_database_url_port
-  fi
+  sync_database_url_port
   if [[ ! -f "$FRONT_DIR/.env.local" ]]; then
     if [[ -f "$FRONT_DIR/.env.local.example" ]]; then
       cp "$FRONT_DIR/.env.local.example" "$FRONT_DIR/.env.local"
@@ -236,7 +234,7 @@ prepare_api
 prepare_front
 
 log "API  → http://localhost:3001/api/v1"
-log "App  → http://localhost:3000/fa"
+log "App  → http://localhost:3000/en"
 log "Ctrl+C to stop both servers"
 echo
 

@@ -155,7 +155,7 @@ function Install-FrontDeps {
 
 function Start-DevServers {
     Write-DevLog 'API  -> http://localhost:3001/api/v1'
-    Write-DevLog 'App  -> http://localhost:3000/fa'
+    Write-DevLog 'App  -> http://localhost:3000/en'
     Write-DevLog 'Ctrl+C to stop both servers'
     Write-Host ''
 
