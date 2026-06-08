@@ -81,6 +81,13 @@ export class RealtimeGateway
     }
   }
 
+  @SubscribeMessage('discover:scan:cancel')
+  handleDiscoverScanCancel(@ConnectedSocket() client: Socket) {
+    const userId = getSocketData(client).userId;
+    if (!userId) return;
+    this.server.to(`user:${userId}`).emit('discover:scan:cancelled', { userId });
+  }
+
   @SubscribeMessage('presence:heartbeat')
   async handlePresenceHeartbeat(@ConnectedSocket() client: Socket) {
     const userId = getSocketData(client).userId;

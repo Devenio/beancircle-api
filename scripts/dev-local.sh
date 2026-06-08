@@ -206,14 +206,62 @@ prepare_front() {
   fi
 }
 
-PIDS=()
+API_PORT=3001
+PGIDS=()
+
+read_api_port() {
+  API_PORT=3001
+  if [[ -f "$API_DIR/.env" ]]; then
+    local port_line
+    port_line="$(grep -E '^PORT=' "$API_DIR/.env" | tail -1 || true)"
+    if [[ -n "$port_line" ]]; then
+      API_PORT="${port_line#PORT=}"
+      API_PORT="${API_PORT%\"}"
+      API_PORT="${API_PORT#\"}"
+      API_PORT="${API_PORT%\'}"
+      API_PORT="${API_PORT#\'}"
+    fi
+  fi
+}
+
+stop_port() {
+  local port="$1"
+  command -v lsof >/dev/null 2>&1 || return 0
+  local pids
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  [[ -z "$pids" ]] && return 0
+  log "stopping existing listener on port $port (pid(s): $pids)"
+  kill $pids 2>/dev/null || true
+  sleep 1
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  [[ -z "$pids" ]] && return 0
+  kill -9 $pids 2>/dev/null || true
+}
+
+start_labeled_process() {
+  local label="$1"
+  local dir="$2"
+  local run_cmd="$3"
+  setsid bash -c "cd $(printf '%q' "$dir") && $run_cmd 2>&1 | sed 's/^/[${label}]    /'" </dev/null &
+  local leader_pid=$!
+  sleep 0.2
+  local pgid
+  pgid="$(ps -o pgid= -p "$leader_pid" 2>/dev/null | tr -d ' ')"
+  [[ -n "$pgid" ]] && PGIDS+=("$pgid")
+}
 
 cleanup() {
-  local pid
+  local pgid
   log "stopping dev servers..."
-  for pid in "${PIDS[@]}"; do
-    kill "$pid" 2>/dev/null || true
+  for pgid in "${PGIDS[@]}"; do
+    kill -TERM -- -"$pgid" 2>/dev/null || true
   done
+  sleep 1
+  for pgid in "${PGIDS[@]}"; do
+    kill -KILL -- -"$pgid" 2>/dev/null || true
+  done
+  stop_port "$API_PORT"
+  stop_port 3000
   wait 2>/dev/null || true
 }
 
@@ -232,25 +280,22 @@ ensure_env_files
 start_infra
 prepare_api
 prepare_front
+read_api_port
+stop_port "$API_PORT"
+stop_port 3000
 
-log "API  → http://localhost:3001/api/v1"
+log "API  → http://localhost:${API_PORT}/api/v1"
 log "App  → http://localhost:3000/en"
 log "Ctrl+C to stop both servers"
 echo
 
-(cd "$API_DIR" && npm run start:dev 2>&1 | sed 's/^/[api]    /') &
-PIDS+=($!)
+start_labeled_process api "$API_DIR" "npm run start:dev"
 
-(
-  cd "$FRONT_DIR"
-  corepack enable 2>/dev/null || true
-  if command -v pnpm >/dev/null 2>&1; then
-    pnpm run dev
-  else
-    npm run dev
-  fi
-) 2>&1 | sed 's/^/[front]  /' &
-PIDS+=($!)
+front_run_cmd="corepack enable 2>/dev/null; pnpm run dev"
+if ! command -v pnpm >/dev/null 2>&1; then
+  front_run_cmd="npm run dev"
+fi
+start_labeled_process front "$FRONT_DIR" "$front_run_cmd"
 
 wait -n || true
 log "a dev server exited — stopping the other"

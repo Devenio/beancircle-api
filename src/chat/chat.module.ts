@@ -9,7 +9,7 @@ import { ChatService } from './chat.service';
   imports: [
     forwardRef(() => NotificationsModule),
     forwardRef(() => RealtimeModule),
-    FriendsModule,
+    forwardRef(() => FriendsModule),
   ],
   controllers: [ChatController],
   providers: [ChatService],
