@@ -41,6 +41,7 @@ export class ChatService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    @Inject(forwardRef(() => FriendsService))
     private friendsService: FriendsService,
     @Inject(forwardRef(() => NotificationsService))
     private notifications: NotificationsService,
