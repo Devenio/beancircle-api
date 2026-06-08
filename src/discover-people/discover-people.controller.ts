@@ -1,11 +1,32 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Post, Query } from '@nestjs/common';
 import { InterestSlug } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { DiscoverPeopleService } from './discover-people.service';
+import { DiscoverScanService } from './discover-scan.service';
 
 @Controller('discover')
 export class DiscoverPeopleController {
-  constructor(private discoverPeople: DiscoverPeopleService) {}
+  constructor(
+    private discoverPeople: DiscoverPeopleService,
+    private discoverScan: DiscoverScanService,
+  ) {}
+
+  @Post('scan')
+  scan(
+    @CurrentUser() user: { id: string },
+    @Query('radiusKm') radiusKm?: string,
+  ) {
+    return this.discoverScan.startScan(
+      user.id,
+      radiusKm ? parseFloat(radiusKm) : 5,
+    );
+  }
+
+  @Delete('scan')
+  cancelScan(@CurrentUser() user: { id: string }) {
+    this.discoverScan.cancelScan(user.id);
+    return { ok: true };
+  }
 
   @Get('nearby')
   nearby(
