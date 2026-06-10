@@ -1,17 +1,4 @@
-databases:
-  - name: beancircle-db
-    databaseName: beancircle
-    plan: free
-    region: oregon
-
 services:
-  - type: keyvalue
-    name: beancircle-redis
-    plan: free
-    region: oregon
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList: []
-
   - type: web
     name: beancircle-api
     runtime: node
@@ -27,14 +14,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: beancircle-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: beancircle-redis
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
