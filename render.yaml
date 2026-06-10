@@ -9,7 +9,7 @@ services:
     autoDeployTrigger: commit
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm prisma generate && pnpm prisma migrate deploy && pnpm run build
     startCommand: pnpm run start:prod
-    healthCheckPath: /api/v1
+    healthCheckPath: /api/v1/health
     envVars:
       - key: NODE_ENV
         value: production
