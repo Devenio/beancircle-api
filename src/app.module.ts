@@ -19,6 +19,7 @@ import { BeanScoreModule } from './beanscore/beanscore.module';
 import { CommunityModule } from './community/community.module';
 import { DiscoverModule } from './discover/discover.module';
 import { DiscoverPeopleModule } from './discover-people/discover-people.module';
+import { DiscoverWorldModule } from './discover-world/discover-world.module';
 import { FriendsModule } from './friends/friends.module';
 import { LocationModule } from './location/location.module';
 import { ReactionsModule } from './reactions/reactions.module';
@@ -72,6 +73,7 @@ import { UsersModule } from './users/users.module';
     PassportModule,
     DiscoverModule,
     DiscoverPeopleModule,
+    DiscoverWorldModule,
     FriendsModule,
     LocationModule,
     BeanScoreModule,

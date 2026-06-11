@@ -597,6 +597,7 @@ model Cafe {
   address        String
   lat            Float
   lng            Float
+  geohash        String?  @db.VarChar(12)
   cityId         String
   countryId      String
   avgRating      Float    @default(0)
@@ -653,6 +654,7 @@ model Cafe {
   @@index([cityId, avgRating])
   @@index([createdAt])
   @@index([followerCount])
+  @@index([geohash])
 }
 
 model CafePhoto {

@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { ActivityType, BadgeCode, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const ACTOR_SELECT = {
   select: { id: true, username: true, name: true, avatarUrl: true },
@@ -36,11 +37,19 @@ export interface RecordActivityInput {
 
 @Injectable()
 export class ActivityService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => RealtimeGateway))
+    private realtime: RealtimeGateway,
+  ) {}
 
-  /** Append an item to the activity ledger. Fire-and-forget friendly. */
+  /**
+   * Append an item to the activity ledger. Fire-and-forget friendly.
+   * City-scoped activities are also pushed live to the `city:{id}` room
+   * so the Discover world feed updates in realtime.
+   */
   async record(input: RecordActivityInput) {
-    return this.prisma.friendActivity.create({
+    const activity = await this.prisma.friendActivity.create({
       data: {
         actorId: input.actorId,
         type: input.type,
@@ -52,7 +61,17 @@ export class ActivityService {
         cityId: input.cityId ?? null,
         payload: input.payload,
       },
+      include: {
+        actor: ACTOR_SELECT,
+        cafe: CAFE_SELECT,
+        event: EVENT_SELECT,
+        squad: SQUAD_SELECT,
+      },
     });
+    if (activity.cityId) {
+      this.realtime.emitToCity(activity.cityId, 'world:activity', activity);
+    }
+    return activity;
   }
 
   /**
@@ -115,7 +134,10 @@ export class ActivityService {
         const freshness = Math.max(0, 50 - hoursAgo * 1.5);
         const engagement = a.cheerCount * 4;
         const locality = me?.cityId && a.cityId === me.cityId ? 15 : 0;
-        return { activity: a, score: friendRelevance + freshness + engagement + locality };
+        return {
+          activity: a,
+          score: friendRelevance + freshness + engagement + locality,
+        };
       })
       .sort((x, y) => y.score - x.score);
 

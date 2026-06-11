@@ -5,6 +5,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import ngeohash from 'ngeohash';
 
 const prisma = new PrismaClient();
 
@@ -113,6 +114,7 @@ async function main() {
       const created = await prisma.cafe.create({
         data: {
           ...cafe,
+          geohash: ngeohash.encode(cafe.lat, cafe.lng, 7),
           cityId: fardisId,
           countryId: iran.id,
           photos: {
