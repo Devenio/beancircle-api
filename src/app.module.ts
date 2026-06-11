@@ -7,6 +7,7 @@ import { CafeOsModule } from './cafe-os/cafe-os.module';
 import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
+import { BeansModule } from './beans/beans.module';
 import { CollectiblesModule } from './collectibles/collectibles.module';
 import { SquadsModule } from './squads/squads.module';
 import { StreaksModule } from './streaks/streaks.module';
@@ -61,6 +62,7 @@ import { UsersModule } from './users/users.module';
     SettingsModule,
     CafesModule,
     PostsModule,
+    BeansModule,
     CommentsModule,
     LikesModule,
     ReviewsModule,

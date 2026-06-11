@@ -95,6 +95,11 @@ enum NotificationType {
   CAFE_ANNOUNCEMENT
   CAFE_STAFF_INVITE
   LOYALTY_REWARD
+  BEAN_REPLY
+  BEAN_REACTION
+  BEAN_MENTION
+  BEAN_REBEAN
+  BEAN_QUOTE
 }
 
 enum GiftStatus {
@@ -183,6 +188,12 @@ enum BeanScoreAction {
   DAILY_ACTIVE
   REFERRAL
   CHALLENGE_COMPLETE
+  BEAN
+  BEAN_MEDIA
+  BEAN_REPLY
+  BEAN_REACTION_RECEIVED
+  BEAN_REBEAN_RECEIVED
+  BEAN_POPULAR
 }
 
 enum ChallengeType {
@@ -269,6 +280,7 @@ model Country {
   users  User[]
   cafes  Cafe[]
   posts  Post[]
+  beans  Bean[]
   reviews Review[]
   checkins Checkin[]
   gifts  GiftCoffee[]
@@ -284,6 +296,7 @@ model City {
   users     User[]
   cafes     Cafe[]
   posts     Post[]
+  beans     Bean[]
   reviews   Review[]
   checkins  Checkin[]
   gifts     GiftCoffee[]
@@ -388,6 +401,10 @@ model User {
   suggestedConnections   SuggestedConnection[] @relation("SuggestedTarget")
   connectionStreak       ConnectionStreak?
   dailyDiscoveries       DailyDiscovery[] @relation("DailyDiscoverer")
+  beans                  Bean[]
+  beanReactions          BeanReaction[]
+  beanPollVotes          BeanPollVote[]
+  beanMentions           BeanMention[]
   discoveredInDaily      DailyDiscovery[] @relation("DailyDiscovered")
 }
 
@@ -649,6 +666,7 @@ model Cafe {
   collectibleCard    CollectibleCard?
   activities         FriendActivity[]
   menu               CafeMenu?
+  beans              Bean[]
 
   @@index([cityId])
   @@index([cityId, avgRating])
@@ -1368,6 +1386,7 @@ model CommunityEvent {
   rsvps         EventRsvp[]
   reminders     EventReminder[]
   activities    FriendActivity[]
+  beans         Bean[]
 
   @@index([startsAt])
   @@index([cityId, startsAt])
@@ -1451,6 +1470,7 @@ model Squad {
   members    SquadMember[]
   messages   SquadMessage[]
   activities FriendActivity[]
+  beans      Bean[]
 
   @@index([cafeId])
   @@index([cityId, memberCount])
@@ -1539,4 +1559,177 @@ model EventReminder {
 
   @@unique([userId, eventId])
   @@index([remindAt, sentAt])
+}
+
+// ===== Beans — the social content layer =====
+
+enum BeanType {
+  QUICK
+  PHOTO
+  VIDEO
+  LOCAL
+  CAFE
+  EVENT
+  COMMUNITY
+}
+
+enum BeanMediaType {
+  IMAGE
+  VIDEO
+  GIF
+}
+
+enum BeanReactionType {
+  LOVE
+  BREWED
+  HOT
+  NICE
+  INSIGHTFUL
+  FUNNY
+}
+
+model Bean {
+  id            String   @id @default(uuid())
+  authorId      String
+  type          BeanType @default(QUICK)
+  body          String?
+  cafeId        String?
+  eventId       String?
+  squadId       String?
+  cityId        String?
+  countryId     String?
+  locationLabel String?
+  lat           Float?
+  lng           Float?
+  linkUrl       String?
+  // Conversations: parent = direct reply target, root = top of the chain
+  parentId      String?
+  rootId        String?
+  quotedBeanId  String?
+  rebeanOfId    String?
+  replyCount    Int      @default(0)
+  rebeanCount   Int      @default(0)
+  quoteCount    Int      @default(0)
+  reactionCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  author     User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  cafe       Cafe?           @relation(fields: [cafeId], references: [id], onDelete: SetNull)
+  event      CommunityEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  squad      Squad?          @relation(fields: [squadId], references: [id], onDelete: SetNull)
+  city       City?           @relation(fields: [cityId], references: [id])
+  country    Country?        @relation(fields: [countryId], references: [id])
+  parent     Bean?           @relation("BeanReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    Bean[]          @relation("BeanReplies")
+  quotedBean Bean?           @relation("BeanQuotes", fields: [quotedBeanId], references: [id], onDelete: SetNull)
+  quotes     Bean[]          @relation("BeanQuotes")
+  rebeanOf   Bean?           @relation("ReBeans", fields: [rebeanOfId], references: [id], onDelete: Cascade)
+  rebeans    Bean[]          @relation("ReBeans")
+  media      BeanMedia[]
+  poll       BeanPoll?
+  reactions  BeanReaction[]
+  hashtags   BeanHashtag[]
+  mentions   BeanMention[]
+
+  @@unique([authorId, rebeanOfId])
+  @@index([authorId, createdAt])
+  @@index([cafeId, createdAt])
+  @@index([squadId, createdAt])
+  @@index([eventId, createdAt])
+  @@index([cityId, createdAt])
+  @@index([parentId, createdAt])
+  @@index([rootId, createdAt])
+  @@index([createdAt])
+}
+
+model BeanMedia {
+  id     String        @id @default(uuid())
+  beanId String
+  type   BeanMediaType @default(IMAGE)
+  url    String
+  order  Int           @default(0)
+  bean   Bean          @relation(fields: [beanId], references: [id], onDelete: Cascade)
+
+  @@index([beanId])
+}
+
+model BeanPoll {
+  id      String    @id @default(uuid())
+  beanId  String    @unique
+  endsAt  DateTime?
+  bean    Bean      @relation(fields: [beanId], references: [id], onDelete: Cascade)
+  options BeanPollOption[]
+  votes   BeanPollVote[]
+}
+
+model BeanPollOption {
+  id        String @id @default(uuid())
+  pollId    String
+  label     String
+  order     Int    @default(0)
+  voteCount Int    @default(0)
+  poll      BeanPoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes     BeanPollVote[]
+
+  @@index([pollId])
+}
+
+model BeanPollVote {
+  id        String   @id @default(uuid())
+  pollId    String
+  optionId  String
+  userId    String
+  createdAt DateTime @default(now())
+  poll      BeanPoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option    BeanPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+  @@index([optionId])
+}
+
+model BeanReaction {
+  id        String           @id @default(uuid())
+  beanId    String
+  userId    String
+  type      BeanReactionType
+  createdAt DateTime         @default(now())
+  bean      Bean             @relation(fields: [beanId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([beanId, userId])
+  @@index([beanId])
+  @@index([createdAt])
+}
+
+model Hashtag {
+  id        String   @id @default(uuid())
+  tag       String   @unique
+  beanCount Int      @default(0)
+  createdAt DateTime @default(now())
+  beans     BeanHashtag[]
+
+  @@index([beanCount])
+}
+
+model BeanHashtag {
+  beanId    String
+  hashtagId String
+  bean      Bean    @relation(fields: [beanId], references: [id], onDelete: Cascade)
+  hashtag   Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@id([beanId, hashtagId])
+  @@index([hashtagId])
+}
+
+model BeanMention {
+  id     String @id @default(uuid())
+  beanId String
+  userId String
+  bean   Bean   @relation(fields: [beanId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([beanId, userId])
+  @@index([userId])
 }
