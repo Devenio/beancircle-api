@@ -570,6 +570,7 @@ model Cafe {
   squads             Squad[]
   collectibleCard    CollectibleCard?
   activities         FriendActivity[]
+  menu               CafeMenu?
 
   @@index([cityId])
   @@index([cityId, avgRating])
@@ -584,6 +585,48 @@ model CafePhoto {
   kind   CafePhotoKind @default(GALLERY)
   order  Int           @default(0)
   cafe   Cafe          @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+}
+
+model CafeMenu {
+  id              String         @id @default(uuid())
+  cafeId          String         @unique
+  slug            String         @unique
+  welcomeTitle    String?
+  welcomeMessage  String?
+  welcomeImageUrl String?
+  accentColor     String         @default("#2C1810")
+  isPublished     Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  cafe            Cafe           @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  categories      MenuCategory[]
+
+  @@index([slug])
+}
+
+model MenuCategory {
+  id     String     @id @default(uuid())
+  menuId String
+  name   String
+  order  Int        @default(0)
+  menu   CafeMenu   @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  items  MenuItem[]
+
+  @@index([menuId, order])
+}
+
+model MenuItem {
+  id          String       @id @default(uuid())
+  categoryId  String
+  name        String
+  description String?
+  price       Int
+  imageUrl    String?
+  order       Int          @default(0)
+  isAvailable Boolean      @default(true)
+  category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, order])
 }
 
 model CafeFollow {
@@ -848,6 +891,7 @@ model Message {
   editedAt       DateTime?
   deletedAt      DateTime?
   isPinned       Boolean     @default(false)
+  spoiler        Boolean     @default(false)
   seenBy         String[]    @default([])
   createdAt      DateTime    @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

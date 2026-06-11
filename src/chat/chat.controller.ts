@@ -121,6 +121,10 @@ class SendMessageDto {
   @IsString()
   @MaxLength(300)
   replyToSnippet?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  spoiler?: boolean;
 }
 
 class CreateConversationDto {

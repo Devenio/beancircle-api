@@ -21,6 +21,7 @@ import { FriendsModule } from './friends/friends.module';
 import { LocationModule } from './location/location.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { WorkModule } from './work/work.module';
+import { MenusModule } from './menus/menus.module';
 import { OwnerModule } from './owner/owner.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { EventsModule } from './events/events.module';
@@ -75,6 +76,7 @@ import { UsersModule } from './users/users.module';
     ReactionsModule,
     WorkModule,
     OwnerModule,
+    MenusModule,
     ChallengesModule,
     EventsModule,
     GrowthModule,

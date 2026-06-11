@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MessageType, NotificationType } from '@prisma/client';
-import { FriendsService } from '../friends/friends.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -34,6 +33,7 @@ type SendMessageInput = {
   replyToSnippet?: string;
   forwardedFromId?: string;
   forwardedFromName?: string;
+  spoiler?: boolean;
 };
 
 @Injectable()
@@ -41,8 +41,6 @@ export class ChatService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
-    @Inject(forwardRef(() => FriendsService))
-    private friendsService: FriendsService,
     @Inject(forwardRef(() => NotificationsService))
     private notifications: NotificationsService,
     @Inject(forwardRef(() => RealtimeGateway))
@@ -163,14 +161,6 @@ export class ChatService {
       },
     });
     if (blocked) throw new ForbiddenException('Cannot message this user');
-    const allowWithoutFriend =
-      this.config.get<string>('ALLOW_DM_WITHOUT_FRIENDSHIP') === 'true';
-    if (!allowWithoutFriend) {
-      const friends = await this.friendsService.friendshipExists(userId, participantId);
-      if (!friends) {
-        throw new ForbiddenException('Messaging requires friendship');
-      }
-    }
     const existing = await this.prisma.conversation.findFirst({
       where: {
         AND: [
@@ -260,6 +250,7 @@ export class ChatService {
       editedAt: Date | null;
       deletedAt: Date | null;
       isPinned: boolean;
+      spoiler?: boolean;
       seenBy: string[];
       createdAt: Date;
       sender?: {
@@ -306,6 +297,7 @@ export class ChatService {
       editedAt: message.editedAt ?? undefined,
       deletedAt: message.deletedAt ?? undefined,
       pinned: message.isPinned,
+      spoiler: message.spoiler ?? false,
       seenBy: message.seenBy,
       reactions:
         'reactions' in message && Array.isArray(message.reactions)
@@ -372,6 +364,7 @@ export class ChatService {
         replyToSnippet: data.replyToSnippet,
         forwardedFromId: data.forwardedFromId,
         forwardedFromName: data.forwardedFromName,
+        spoiler: data.spoiler ?? false,
         seenBy: [senderId],
       },
       include: {
