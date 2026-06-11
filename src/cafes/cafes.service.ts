@@ -24,6 +24,18 @@ export class CafesService {
       include: {
         photos: { orderBy: { order: 'asc' } },
         city: true,
+        menu: { select: { slug: true, isPublished: true } },
+        squads: {
+          where: { isPublic: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            emoji: true,
+            memberCount: true,
+            description: true,
+          },
+        },
         reviews: {
           take: 5,
           orderBy: { createdAt: 'desc' },

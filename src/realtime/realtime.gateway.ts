@@ -111,6 +111,32 @@ export class RealtimeGateway
     this.server.to(`squad:${squadId}`).emit(event, data);
   }
 
+  emitToCafe(cafeId: string, event: string, data: unknown) {
+    this.server.to(`cafe:${cafeId}`).emit(event, data);
+  }
+
+  @SubscribeMessage('cafe:join')
+  async joinCafe(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() cafeId: string,
+  ) {
+    const userId = getSocketData(client).userId;
+    if (!userId || !cafeId) return;
+    const staff = await this.prisma.cafeStaff.findUnique({
+      where: { userId_cafeId: { userId, cafeId } },
+      select: { id: true },
+    });
+    if (staff) await client.join(`cafe:${cafeId}`);
+  }
+
+  @SubscribeMessage('cafe:leave')
+  async leaveCafe(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() cafeId: string,
+  ) {
+    await client.leave(`cafe:${cafeId}`);
+  }
+
   @SubscribeMessage('squad:join')
   async joinSquad(
     @ConnectedSocket() client: Socket,

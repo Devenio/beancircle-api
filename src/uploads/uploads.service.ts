@@ -18,7 +18,14 @@ const MIME_MAX_BYTES: Record<string, number> = {
   'audio/ogg': 16 * 1024 * 1024,
 };
 
-const ALLOWED_FOLDERS = new Set(['avatars', 'posts', 'reviews', 'messages']);
+const ALLOWED_FOLDERS = new Set([
+  'avatars',
+  'posts',
+  'reviews',
+  'messages',
+  'cafes',
+  'menus',
+]);
 
 @Injectable()
 export class UploadsService {

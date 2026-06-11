@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { ActivityService } from '../activity/activity.service';
 import { BeanScoreService } from '../beanscore/beanscore.service';
+import { CafeOsHooksService } from '../cafe-os/cafe-os-hooks.service';
 import { ChallengesService } from '../challenges/challenges.service';
 import { CollectiblesService } from '../collectibles/collectibles.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -36,6 +37,7 @@ export class PassportService implements OnModuleInit {
     private collectibles: CollectiblesService,
     private activity: ActivityService,
     private notifications: NotificationsService,
+    private cafeOsHooks: CafeOsHooksService,
   ) {}
 
   async onModuleInit() {
@@ -405,8 +407,12 @@ export class PassportService implements OnModuleInit {
     // Notify followers that a friend just checked in (capped fan-out).
     await this.notifyFollowersOfCheckin(userId, cafe.id, cafe.name);
 
+    // Cafe OS: CRM record, loyalty progress, live dashboard tick.
+    const cafeOs = await this.cafeOsHooks.onCheckin(cafe.id, userId);
+
     return {
       checkin: result.checkin,
+      loyalty: cafeOs?.completedPrograms ?? [],
       stamp: result.stamp,
       newStamp: result.newStamp,
       passport: updatedPassport,

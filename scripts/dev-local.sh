@@ -167,6 +167,9 @@ start_infra() {
     sleep 1
   done
   log "PostgreSQL is ready"
+
+  log "configuring MinIO (bucket + CORS)..."
+  bash "$SCRIPT_DIR/setup-minio.sh"
 }
 
 prepare_api() {
@@ -277,12 +280,12 @@ maybe_delegate_to_windows
 load_nvm
 require_node
 ensure_env_files
-start_infra
-prepare_api
-prepare_front
 read_api_port
 stop_port "$API_PORT"
 stop_port 3000
+start_infra
+prepare_api
+prepare_front
 
 log "API  → http://localhost:${API_PORT}/api/v1"
 log "App  → http://localhost:3000/en"
