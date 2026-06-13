@@ -324,7 +324,6 @@ async function main() {
     });
   }
 
-  const ngeohash = require('ngeohash');
   const baseLat = 35.724;
   const baseLng = 50.991;
   for (const [user, offset] of [

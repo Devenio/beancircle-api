@@ -22,6 +22,25 @@ function Write-DevLog([string]$Message) {
     Write-Host "[dev-local] $Message"
 }
 
+# Remove-Item chokes on node_modules paths that exceed Windows' 260-char MAX_PATH
+# (deeply nested pnpm/Next.js trees). Mirror an empty dir over the target with
+# robocopy first (long-path aware), then drop the now-empty tree.
+function Remove-NodeModules([string]$Path) {
+    if (-not (Test-Path $Path)) { return }
+    $empty = Join-Path $env:TEMP ("dev-local-empty-" + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $empty | Out-Null
+    try {
+        # robocopy exit codes < 8 are success; only >= 8 indicates a real failure.
+        robocopy $empty $Path /MIR /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy failed clearing $Path (code $LASTEXITCODE)" }
+        Remove-Item -Recurse -Force $Path
+    }
+    finally {
+        Remove-Item -Recurse -Force $empty -ErrorAction SilentlyContinue
+        $global:LASTEXITCODE = 0
+    }
+}
+
 # Native tools (npx/npm) write warnings to stderr; PS 5.1 treats that as fatal when
 # ErrorActionPreference is Stop. Only fail on exit code.
 function Invoke-External {
@@ -198,7 +217,7 @@ function Install-ApiDeps {
         if ($Setup -or -not (Test-Path 'node_modules')) {
             if ($Setup -and (Test-Path 'node_modules')) {
                 Write-DevLog 'removing api/node_modules (clean setup)...'
-                Remove-Item -Recurse -Force node_modules
+                Remove-NodeModules (Join-Path $ApiDir 'node_modules')
             }
             Write-DevLog 'npm install (api)...'
             Invoke-External 'npm install (api)' { npm install }
@@ -225,7 +244,7 @@ function Install-FrontDeps {
         if ($Setup -or -not (Test-Path 'node_modules')) {
             if ($Setup -and (Test-Path 'node_modules')) {
                 Write-DevLog 'removing front/node_modules (clean setup)...'
-                Remove-Item -Recurse -Force node_modules
+                Remove-NodeModules (Join-Path $FrontDir 'node_modules')
             }
             Write-DevLog 'pnpm install (front)...'
             Invoke-External 'pnpm install (front)' { corepack enable 2>$null; pnpm install }
