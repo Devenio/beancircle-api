@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { SmsService } from '../sms/sms.service';
 import {
   requestSessionMeta,
   type SessionMeta,
@@ -41,6 +42,7 @@ export class AuthService {
     private redis: RedisService,
     private jwt: JwtService,
     private config: ConfigService,
+    private sms: SmsService,
   ) {}
 
   private sessionFromRequest(req?: {
@@ -51,14 +53,24 @@ export class AuthService {
   }
 
   async requestOtp(phone: string) {
-    const code =
-      this.config.get('SMS_PROVIDER') === 'mock'
-        ? '123456'
-        : String(Math.floor(100000 + Math.random() * 900000));
+    const isMock = this.config.get('SMS_PROVIDER') === 'mock';
+    const code = isMock
+      ? '123456'
+      : String(Math.floor(100000 + Math.random() * 900000));
+
     await this.redis.setOtp(phone, code);
-    if (this.config.get('SMS_PROVIDER') === 'mock') {
+
+    if (isMock) {
       return { message: 'OTP sent (mock)', code };
     }
+
+    const templateId = Number(
+      this.config.get<string>('SMSIR_OTP_TEMPLATE_ID') ?? '0',
+    );
+    await this.sms.sendVerifyCode(phone, templateId, [
+      { name: 'Code', value: code },
+    ]);
+
     return { message: 'OTP sent' };
   }
 
