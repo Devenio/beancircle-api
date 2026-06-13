@@ -11,7 +11,7 @@ class ClaimCafeDto {
     message:
       'claimCode must contain only uppercase letters, digits, and hyphens',
   })
-  claimCode: string | undefined;
+  claimCode: string;
 }
 
 class UpdateOwnerCafeDto {

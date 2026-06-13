@@ -25,6 +25,7 @@ const ALLOWED_FOLDERS = new Set([
   'messages',
   'cafes',
   'menus',
+  'bug-reports',
 ]);
 
 @Injectable()

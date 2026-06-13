@@ -22,7 +22,7 @@ class PresignDto {
   contentType: string;
 
   @IsString()
-  @IsIn(['avatars', 'posts', 'reviews', 'messages', 'cafes', 'menus'])
+  @IsIn(['avatars', 'posts', 'reviews', 'messages', 'cafes', 'menus', 'bug-reports'])
   folder: string;
 }
 

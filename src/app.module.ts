@@ -38,6 +38,7 @@ import { HomeModule } from './home/home.module';
 import { PassportModule } from './passport/passport.module';
 import { LikesModule } from './likes/likes.module';
 import { ReportsModule } from './reports/reports.module';
+import { BugReportsModule } from './bug-reports/bug-reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PostsModule } from './posts/posts.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -94,6 +95,7 @@ import { UsersModule } from './users/users.module';
     EventsModule,
     GrowthModule,
     ReportsModule,
+    BugReportsModule,
     AdminModule,
     UploadsModule,
     RealtimeModule,

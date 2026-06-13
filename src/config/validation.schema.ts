@@ -49,4 +49,9 @@ export const validationSchema = Joi.object({
   VAPID_SUBJECT: Joi.string().default('mailto:hello@beancircle.app'),
   VAPID_PUBLIC_KEY: Joi.string().allow('').optional(),
   VAPID_PRIVATE_KEY: Joi.string().allow('').optional(),
+
+  // AI bug triage (optional). When ANTHROPIC_API_KEY is absent the triage
+  // service falls back to a deterministic heuristic.
+  ANTHROPIC_API_KEY: Joi.string().allow('').optional(),
+  BUG_TRIAGE_MODEL: Joi.string().default('claude-haiku-4-5'),
 });
