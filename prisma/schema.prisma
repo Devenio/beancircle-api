@@ -48,6 +48,7 @@ enum NotificationType {
   STREAK_MILESTONE
   FRIEND_REQUEST
   FRIEND_ACCEPTED
+  CAFE_DAILY_WIN
 }
 
 enum GiftStatus {
@@ -331,6 +332,7 @@ model User {
   friendshipsAsB         Friendship[]    @relation("FriendshipB")
   suggestedFor           SuggestedConnection[] @relation("SuggestedForUser")
   suggestedConnections   SuggestedConnection[] @relation("SuggestedTarget")
+  dailyDrawWins          CafeDailyDrawWinner[]
   connectionStreak       ConnectionStreak?
   dailyDiscoveries       DailyDiscovery[] @relation("DailyDiscoverer")
   discoveredInDaily      DailyDiscovery[] @relation("DailyDiscovered")
@@ -570,6 +572,7 @@ model Cafe {
   squads             Squad[]
   collectibleCard    CollectibleCard?
   activities         FriendActivity[]
+  dailyDraws         CafeDailyDraw[]
 
   @@index([cityId])
   @@index([cityId, avgRating])
@@ -727,10 +730,45 @@ model Checkin {
   country   Country  @relation(fields: [countryId], references: [id])
   post      Post?
   stamp     Stamp?
+  dailyDrawWin CafeDailyDrawWinner?
 
   @@index([userId, createdAt])
   @@index([cafeId, createdAt])
   @@index([userId, cafeId, createdAt])
+}
+
+model CafeDailyDraw {
+  id          String   @id @default(uuid())
+  cafeId      String
+  day         DateTime @db.Date
+  winnerCount Int      @default(0)
+  maxWinners  Int      @default(10)
+  createdAt   DateTime @default(now())
+
+  cafe    Cafe                  @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  winners CafeDailyDrawWinner[]
+
+  @@unique([cafeId, day])
+  @@index([day])
+}
+
+model CafeDailyDrawWinner {
+  id          String    @id @default(uuid())
+  drawId      String
+  userId      String
+  checkinId   String    @unique
+  voucherCode String    @unique
+  notifiedAt  DateTime?
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  draw    CafeDailyDraw @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkin Checkin       @relation(fields: [checkinId], references: [id], onDelete: Cascade)
+
+  @@unique([drawId, userId])
+  @@index([userId])
+  @@index([voucherCode])
 }
 
 model Passport {

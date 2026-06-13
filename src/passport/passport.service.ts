@@ -18,6 +18,7 @@ import { BeanScoreService } from '../beanscore/beanscore.service';
 import { ChallengesService } from '../challenges/challenges.service';
 import { CollectiblesService } from '../collectibles/collectibles.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PromotionsService } from '../promotions/promotions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StreakService } from '../streaks/streaks.service';
 import { PassportCheckinDto } from './dto/passport-checkin.dto';
@@ -36,6 +37,7 @@ export class PassportService implements OnModuleInit {
     private collectibles: CollectiblesService,
     private activity: ActivityService,
     private notifications: NotificationsService,
+    private promotions: PromotionsService,
   ) {}
 
   async onModuleInit() {
@@ -405,6 +407,13 @@ export class PassportService implements OnModuleInit {
     // Notify followers that a friend just checked in (capped fan-out).
     await this.notifyFollowersOfCheckin(userId, cafe.id, cafe.name);
 
+    const dailyWin = await this.promotions.tryWinOnCheckin(
+      userId,
+      cafe.id,
+      result.checkin.id,
+      cafe.isPartner,
+    );
+
     return {
       checkin: result.checkin,
       stamp: result.stamp,
@@ -414,6 +423,7 @@ export class PassportService implements OnModuleInit {
       unlockedRewards,
       collectible: collectible.isNew ? collectible.card : null,
       streaks: { consecutive, weekly, milestone: streakMilestone },
+      dailyWin,
     };
   }
 

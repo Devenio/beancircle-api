@@ -26,6 +26,8 @@ import { ChallengesModule } from './challenges/challenges.module';
 import { EventsModule } from './events/events.module';
 import { GrowthModule } from './growth/growth.module';
 import { GiftsModule } from './gifts/gifts.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { ScanModule } from './scan/scan.module';
 import { HomeModule } from './home/home.module';
 import { PassportModule } from './passport/passport.module';
 import { LikesModule } from './likes/likes.module';
@@ -64,6 +66,8 @@ import { UsersModule } from './users/users.module';
     ChatModule,
     NotificationsModule,
     GiftsModule,
+    PromotionsModule,
+    ScanModule,
     HomeModule,
     PassportModule,
     DiscoverModule,
