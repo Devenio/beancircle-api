@@ -9,17 +9,47 @@ import {
 } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PushSubscriptionDto } from '../push/dto/push-subscription.dto';
+import { PushService } from '../push/push.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UsersService } from './users.service';
 
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private push: PushService,
+  ) {}
 
   @Public()
   @Get('cities')
   listCities() {
     return this.usersService.listCities();
+  }
+
+  /** VAPID public key clients need to create a push subscription. */
+  @Public()
+  @Get('push/public-key')
+  pushPublicKey() {
+    return { publicKey: this.push.getPublicKey() };
+  }
+
+  /** Register this device's Web Push subscription. */
+  @Post('me/push-token')
+  savePushToken(
+    @CurrentUser() user: { id: string },
+    @Body() dto: PushSubscriptionDto,
+  ) {
+    return this.push.saveSubscription(user.id, dto);
+  }
+
+  /** Remove a device's Web Push subscription (on logout / unsubscribe). */
+  @Delete('me/push-token')
+  removePushToken(
+    @CurrentUser() user: { id: string },
+    @Body('endpoint') endpoint: string,
+  ) {
+    return this.push.removeSubscription(user.id, endpoint);
   }
 
   @Get('me')
