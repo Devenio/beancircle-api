@@ -26,8 +26,9 @@ export class EventsController {
   list(
     @Query('cityId') cityId?: string,
     @Query('type') type?: EventType,
+    @Query('cafeId') cafeId?: string,
   ) {
-    return this.events.listUpcoming({ cityId, type });
+    return this.events.listUpcoming({ cityId, type, cafeId });
   }
 
   @Post()

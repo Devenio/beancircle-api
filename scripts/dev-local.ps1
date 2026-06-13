@@ -22,6 +22,54 @@ function Write-DevLog([string]$Message) {
     Write-Host "[dev-local] $Message"
 }
 
+# Remove-Item chokes on node_modules paths that exceed Windows' 260-char MAX_PATH
+# (deeply nested pnpm/Next.js trees). Mirror an empty dir over the target with
+# robocopy first (long-path aware), then drop the now-empty tree.
+function Remove-NodeModules([string]$Path) {
+    if (-not (Test-Path $Path)) { return }
+    $empty = Join-Path $env:TEMP ("dev-local-empty-" + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $empty | Out-Null
+    try {
+        # robocopy exit codes < 8 are success; only >= 8 indicates a real failure.
+        robocopy $empty $Path /MIR /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw "robocopy failed clearing $Path (code $LASTEXITCODE)" }
+        Remove-Item -Recurse -Force $Path
+    }
+    finally {
+        Remove-Item -Recurse -Force $empty -ErrorAction SilentlyContinue
+        $global:LASTEXITCODE = 0
+    }
+}
+
+# Native tools (npx/npm) write warnings to stderr; PS 5.1 treats that as fatal when
+# ErrorActionPreference is Stop. Only fail on exit code.
+function Invoke-External {
+    param(
+        [Parameter(Mandatory)][string]$Label,
+        [Parameter(Mandatory)][scriptblock]$Command
+    )
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $Command 2>&1
+        $code = $LASTEXITCODE
+        foreach ($line in $output) {
+            if ($line -is [System.Management.Automation.ErrorRecord]) {
+                Write-Host $line.ToString()
+            }
+            else {
+                Write-Host $line
+            }
+        }
+        if ($code -ne 0) {
+            throw "$Label failed (exit $code)"
+        }
+    }
+    finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 function Test-NodeVersion {
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         throw 'Node.js not found. Install Node 20+ or 24 LTS (avoid Node 23).'
@@ -73,6 +121,64 @@ function Ensure-EnvFiles {
     }
 }
 
+function Get-ApiPort {
+    $port = 3001
+    $apiEnv = Join-Path $ApiDir '.env'
+    if (Test-Path $apiEnv) {
+        $line = Select-String -Path $apiEnv -Pattern '^\s*PORT\s*=' | Select-Object -Last 1
+        if ($line) {
+            $value = ($line.Line -split '=', 2)[1].Trim().Trim('"').Trim("'")
+            if ($value -match '^\d+$') { $port = [int]$value }
+        }
+    }
+    return $port
+}
+
+function Stop-PortListener {
+    param([int]$Port)
+    $seen = @{}
+    $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    foreach ($conn in $connections) {
+        $procId = $conn.OwningProcess
+        if (-not $procId -or $procId -eq $PID -or $seen.ContainsKey($procId)) { continue }
+        $seen[$procId] = $true
+        Write-DevLog "stopping existing listener on port $Port (pid $procId)"
+        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+    }
+    if ($seen.Count -gt 0) { Start-Sleep -Seconds 1 }
+}
+
+function Invoke-PrismaGenerate {
+    $maxAttempts = 3
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            $lines = & npx prisma generate 2>&1
+            $output = ($lines | ForEach-Object {
+                if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { "$_" }
+            }) -join "`n"
+            foreach ($line in $lines) {
+                if ($line -is [System.Management.Automation.ErrorRecord]) { Write-Host $line.ToString() }
+                else { Write-Host $line }
+            }
+            if ($LASTEXITCODE -eq 0) { return }
+            if ($attempt -lt $maxAttempts -and $output -match 'EPERM|operation not permitted') {
+                Write-DevLog "prisma generate locked (attempt $($attempt)/$($maxAttempts)) - stopping dev servers and retrying..."
+                Stop-PortListener (Get-ApiPort)
+                Stop-PortListener 3000
+                Start-Sleep -Seconds 2
+                continue
+            }
+            if ($output) { Write-Host $output }
+            throw 'prisma generate failed'
+        }
+    }
+    finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 function Start-Infra {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw 'Docker not found. Start Docker Desktop and retry.'
@@ -97,6 +203,8 @@ function Start-Infra {
             }
         } until ($ready)
         Write-DevLog 'PostgreSQL is ready'
+        Write-DevLog 'configuring MinIO (bucket + CORS)...'
+        & (Join-Path $PSScriptRoot 'setup-minio.ps1')
     }
     finally {
         Pop-Location
@@ -109,21 +217,17 @@ function Install-ApiDeps {
         if ($Setup -or -not (Test-Path 'node_modules')) {
             if ($Setup -and (Test-Path 'node_modules')) {
                 Write-DevLog 'removing api/node_modules (clean setup)...'
-                Remove-Item -Recurse -Force node_modules
+                Remove-NodeModules (Join-Path $ApiDir 'node_modules')
             }
             Write-DevLog 'npm install (api)...'
-            npm install
-            if ($LASTEXITCODE -ne 0) { throw 'npm install (api) failed' }
+            Invoke-External 'npm install (api)' { npm install }
         }
         Write-DevLog 'prisma generate + migrate deploy...'
-        npx prisma generate
-        if ($LASTEXITCODE -ne 0) { throw 'prisma generate failed' }
-        npx prisma migrate deploy
-        if ($LASTEXITCODE -ne 0) { throw 'prisma migrate deploy failed' }
+        Invoke-PrismaGenerate
+        Invoke-External 'prisma migrate deploy' { npx prisma migrate deploy }
         if ($Seed) {
             Write-DevLog 'seeding database...'
-            npx prisma db seed
-            if ($LASTEXITCODE -ne 0) { throw 'prisma db seed failed' }
+            Invoke-External 'prisma db seed' { npx prisma db seed }
         }
     }
     finally {
@@ -140,12 +244,10 @@ function Install-FrontDeps {
         if ($Setup -or -not (Test-Path 'node_modules')) {
             if ($Setup -and (Test-Path 'node_modules')) {
                 Write-DevLog 'removing front/node_modules (clean setup)...'
-                Remove-Item -Recurse -Force node_modules
+                Remove-NodeModules (Join-Path $FrontDir 'node_modules')
             }
             Write-DevLog 'pnpm install (front)...'
-            corepack enable 2>$null
-            pnpm install
-            if ($LASTEXITCODE -ne 0) { throw 'pnpm install (front) failed' }
+            Invoke-External 'pnpm install (front)' { corepack enable 2>$null; pnpm install }
         }
     }
     finally {
@@ -154,7 +256,8 @@ function Install-FrontDeps {
 }
 
 function Start-DevServers {
-    Write-DevLog 'API  -> http://localhost:3001/api/v1'
+    $apiPort = Get-ApiPort
+    Write-DevLog "API  -> http://localhost:${apiPort}/api/v1"
     Write-DevLog 'App  -> http://localhost:3000/en'
     Write-DevLog 'Ctrl+C to stop both servers'
     Write-Host ''
@@ -170,7 +273,7 @@ function Start-DevServers {
         Wait-Process -Id $api.Id, $front.Id
     }
     catch {
-        Write-DevLog 'a dev server exited — stopping the other'
+        Write-DevLog 'a dev server exited - stopping the other'
     }
     finally {
         Write-DevLog 'stopping dev servers...'
@@ -184,6 +287,9 @@ function Start-DevServers {
 
 Test-NodeVersion
 Ensure-EnvFiles
+$script:ApiPort = Get-ApiPort
+Stop-PortListener $script:ApiPort
+Stop-PortListener 3000
 Start-Infra
 Install-ApiDeps
 Install-FrontDeps

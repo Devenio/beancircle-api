@@ -53,10 +53,11 @@ export class RealtimeGateway
       socketData.userId = payload.sub;
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { username: true },
+        select: { username: true, cityId: true },
       });
       socketData.username = user?.username ?? null;
       await client.join(`user:${payload.sub}`);
+      if (user?.cityId) await client.join(`city:${user.cityId}`);
       await this.redis.setOnline(payload.sub);
       await this.prisma.user.update({
         where: { id: payload.sub },
@@ -77,7 +78,11 @@ export class RealtimeGateway
         where: { id: userId },
         data: { lastSeenAt },
       });
-      this.server.emit('presence', { userId, online: false, lastSeenAt: lastSeenAt.toISOString() });
+      this.server.emit('presence', {
+        userId,
+        online: false,
+        lastSeenAt: lastSeenAt.toISOString(),
+      });
     }
   }
 
@@ -85,7 +90,9 @@ export class RealtimeGateway
   handleDiscoverScanCancel(@ConnectedSocket() client: Socket) {
     const userId = getSocketData(client).userId;
     if (!userId) return;
-    this.server.to(`user:${userId}`).emit('discover:scan:cancelled', { userId });
+    this.server
+      .to(`user:${userId}`)
+      .emit('discover:scan:cancelled', { userId });
   }
 
   @SubscribeMessage('presence:heartbeat')
@@ -109,6 +116,36 @@ export class RealtimeGateway
 
   emitToSquad(squadId: string, event: string, data: unknown) {
     this.server.to(`squad:${squadId}`).emit(event, data);
+  }
+
+  emitToCafe(cafeId: string, event: string, data: unknown) {
+    this.server.to(`cafe:${cafeId}`).emit(event, data);
+  }
+
+  emitToCity(cityId: string, event: string, data: unknown) {
+    this.server.to(`city:${cityId}`).emit(event, data);
+  }
+
+  @SubscribeMessage('cafe:join')
+  async joinCafe(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() cafeId: string,
+  ) {
+    const userId = getSocketData(client).userId;
+    if (!userId || !cafeId) return;
+    const staff = await this.prisma.cafeStaff.findUnique({
+      where: { userId_cafeId: { userId, cafeId } },
+      select: { id: true },
+    });
+    if (staff) await client.join(`cafe:${cafeId}`);
+  }
+
+  @SubscribeMessage('cafe:leave')
+  async leaveCafe(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() cafeId: string,
+  ) {
+    await client.leave(`cafe:${cafeId}`);
   }
 
   @SubscribeMessage('squad:join')

@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { CafeOsModule } from './cafe-os/cafe-os.module';
 import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
+import { BeansModule } from './beans/beans.module';
 import { CollectiblesModule } from './collectibles/collectibles.module';
 import { SquadsModule } from './squads/squads.module';
 import { StreaksModule } from './streaks/streaks.module';
@@ -17,10 +20,12 @@ import { BeanScoreModule } from './beanscore/beanscore.module';
 import { CommunityModule } from './community/community.module';
 import { DiscoverModule } from './discover/discover.module';
 import { DiscoverPeopleModule } from './discover-people/discover-people.module';
+import { DiscoverWorldModule } from './discover-world/discover-world.module';
 import { FriendsModule } from './friends/friends.module';
 import { LocationModule } from './location/location.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { WorkModule } from './work/work.module';
+import { MenusModule } from './menus/menus.module';
 import { OwnerModule } from './owner/owner.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { EventsModule } from './events/events.module';
@@ -46,6 +51,7 @@ import { UsersModule } from './users/users.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     PrismaModule,
     RedisModule,
@@ -58,6 +64,7 @@ import { UsersModule } from './users/users.module';
     SettingsModule,
     CafesModule,
     PostsModule,
+    BeansModule,
     CommentsModule,
     LikesModule,
     ReviewsModule,
@@ -72,6 +79,7 @@ import { UsersModule } from './users/users.module';
     PassportModule,
     DiscoverModule,
     DiscoverPeopleModule,
+    DiscoverWorldModule,
     FriendsModule,
     LocationModule,
     BeanScoreModule,
@@ -79,6 +87,8 @@ import { UsersModule } from './users/users.module';
     ReactionsModule,
     WorkModule,
     OwnerModule,
+    CafeOsModule,
+    MenusModule,
     ChallengesModule,
     EventsModule,
     GrowthModule,

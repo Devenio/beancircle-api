@@ -1,6 +1,11 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { BeanScoreAction, ChallengeType } from '@prisma/client';
+import {
+  BeanScoreAction,
+  ChallengeType,
+  NotificationType,
+} from '@prisma/client';
 import { BeanScoreService } from '../beanscore/beanscore.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -8,6 +13,7 @@ export class ChallengesService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private beanScore: BeanScoreService,
+    private notifications: NotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -159,6 +165,16 @@ export class ChallengesService implements OnModuleInit {
           challenge.id,
           challenge.rewardPoints,
         );
+        await this.notifications.create({
+          userId,
+          type: NotificationType.CHALLENGE_COMPLETE,
+          entityType: 'challenge',
+          entityId: challenge.id,
+          payload: {
+            challengeTitle: challenge.title,
+            points: challenge.rewardPoints,
+          },
+        });
       }
     }
   }

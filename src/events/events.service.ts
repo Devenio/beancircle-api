@@ -63,13 +63,24 @@ export class EventsService implements OnModuleInit {
     });
   }
 
-  listUpcoming(params: { cityId?: string; type?: EventType; limit?: number } = {}) {
-    const { cityId, type, limit = 30 } = params;
+  listUpcoming(
+    params: {
+      cityId?: string;
+      type?: EventType;
+      cafeId?: string;
+      limit?: number;
+    } = {},
+  ) {
+    const { cityId, type, cafeId, limit = 30 } = params;
     const now = new Date();
     const where: Prisma.CommunityEventWhereInput = {
       endsAt: { gte: now },
       ...(type ? { type } : {}),
-      ...(cityId ? { OR: [{ cityId: null }, { cityId }] } : {}),
+      ...(cafeId
+        ? { cafeId }
+        : cityId
+          ? { OR: [{ cityId: null }, { cityId }] }
+          : {}),
     };
     return this.prisma.communityEvent.findMany({
       where,
@@ -106,6 +117,19 @@ export class EventsService implements OnModuleInit {
       myRsvp: myRsvp?.status ?? null,
       myReminder: myReminder?.remindAt ?? null,
     };
+  }
+
+  /** All events of a cafe (upcoming first, then recent past) for Cafe OS. */
+  listForCafe(cafeId: string) {
+    return this.prisma.communityEvent.findMany({
+      where: { cafeId },
+      orderBy: { startsAt: 'desc' },
+      take: 50,
+      include: {
+        host: HOST_SELECT,
+        _count: { select: { rsvps: true } },
+      },
+    });
   }
 
   participants(eventId: string) {

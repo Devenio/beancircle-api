@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { ActivityService } from '../activity/activity.service';
 import { BeanScoreService } from '../beanscore/beanscore.service';
+import { CafeOsHooksService } from '../cafe-os/cafe-os-hooks.service';
 import { ChallengesService } from '../challenges/challenges.service';
 import { CollectiblesService } from '../collectibles/collectibles.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -38,6 +39,7 @@ export class PassportService implements OnModuleInit {
     private activity: ActivityService,
     private notifications: NotificationsService,
     private promotions: PromotionsService,
+    private cafeOsHooks: CafeOsHooksService,
   ) {}
 
   async onModuleInit() {
@@ -237,7 +239,12 @@ export class PassportService implements OnModuleInit {
     }
 
     if (dto.lat != null && dto.lng != null) {
-      const distance = this.haversineMeters(dto.lat, dto.lng, cafe.lat, cafe.lng);
+      const distance = this.haversineMeters(
+        dto.lat,
+        dto.lng,
+        cafe.lat,
+        cafe.lng,
+      );
       if (distance > MAX_CHECKIN_DISTANCE_METERS) {
         throw new BadRequestException('You must be near the cafe to check in');
       }
@@ -330,7 +337,10 @@ export class PassportService implements OnModuleInit {
     });
 
     const earnedBadges = await this.evaluateBadges(userId, updatedPassport);
-    const unlockedRewards = await this.evaluateRewards(userId, updatedPassport.totalStamps);
+    const unlockedRewards = await this.evaluateRewards(
+      userId,
+      updatedPassport.totalStamps,
+    );
 
     await this.beanScore.award(
       userId,
@@ -345,11 +355,7 @@ export class PassportService implements OnModuleInit {
       );
     }
 
-    await this.challenges.recordCheckin(
-      userId,
-      result.newStamp,
-      cafe.id,
-    );
+    await this.challenges.recordCheckin(userId, result.newStamp, cafe.id);
 
     // Streak engine: extend consecutive + weekly streaks.
     const [consecutive, weekly] = await Promise.all([
@@ -384,7 +390,10 @@ export class PassportService implements OnModuleInit {
         type: ActivityType.FRIEND_COLLECTED_CARD,
         cafeId: cafe.id,
         cityId: cafe.cityId,
-        payload: { rarity: collectible.card.rarity, cardName: collectible.card.name },
+        payload: {
+          rarity: collectible.card.rarity,
+          cardName: collectible.card.name,
+        },
       });
     }
     for (const b of earnedBadges) {
@@ -413,9 +422,12 @@ export class PassportService implements OnModuleInit {
       result.checkin.id,
       cafe.isPartner,
     );
+    // Cafe OS: CRM record, loyalty progress, live dashboard tick.
+    const cafeOs = await this.cafeOsHooks.onCheckin(cafe.id, userId);
 
     return {
       checkin: result.checkin,
+      loyalty: cafeOs?.completedPrograms ?? [],
       stamp: result.stamp,
       newStamp: result.newStamp,
       passport: updatedPassport,
@@ -452,7 +464,10 @@ export class PassportService implements OnModuleInit {
     );
   }
 
-  private async evaluateBadges(userId: string, passport: { totalStamps: number; totalCheckins: number }) {
+  private async evaluateBadges(
+    userId: string,
+    passport: { totalStamps: number; totalCheckins: number },
+  ) {
     const definitions = await this.prisma.badgeDefinition.findMany();
     const existing = await this.prisma.userBadge.findMany({
       where: { userId },

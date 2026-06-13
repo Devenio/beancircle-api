@@ -4,22 +4,35 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CafeRole } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+
+const EDIT_ROLES: CafeRole[] = [CafeRole.OWNER, CafeRole.MANAGER];
 
 @Injectable()
 export class OwnerService {
   constructor(private prisma: PrismaService) {}
 
-  async assertOwner(userId: string, cafeId: string) {
-    const row = await this.prisma.cafeOwner.findUnique({
+  /** Any staff member of the cafe. */
+  async assertStaff(userId: string, cafeId: string, roles?: CafeRole[]) {
+    const row = await this.prisma.cafeStaff.findUnique({
       where: { userId_cafeId: { userId, cafeId } },
     });
-    if (!row) throw new ForbiddenException('Not a cafe owner');
+    if (!row) throw new ForbiddenException('Not a member of this cafe');
+    if (roles?.length && !roles.includes(row.role)) {
+      throw new ForbiddenException('Insufficient cafe role');
+    }
+    return row;
+  }
+
+  /** Back-compat: owner/manager level access. */
+  async assertOwner(userId: string, cafeId: string) {
+    await this.assertStaff(userId, cafeId, EDIT_ROLES);
   }
 
   listCafes(userId: string) {
-    return this.prisma.cafeOwner.findMany({
+    return this.prisma.cafeStaff.findMany({
       where: { userId },
       include: {
         cafe: {
@@ -40,14 +53,14 @@ export class OwnerService {
     if (!cafe) {
       throw new NotFoundException('Invalid claim code');
     }
-    const existing = await this.prisma.cafeOwner.findUnique({
+    const existing = await this.prisma.cafeStaff.findUnique({
       where: { userId_cafeId: { userId, cafeId: cafe.id } },
     });
     if (existing) {
       return { cafe, alreadyOwned: true };
     }
-    await this.prisma.cafeOwner.create({
-      data: { userId, cafeId: cafe.id },
+    await this.prisma.cafeStaff.create({
+      data: { userId, cafeId: cafe.id, role: CafeRole.OWNER },
     });
     return { cafe, alreadyOwned: false };
   }

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { encodeGeohash } from '../common/geo/geo.util';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -24,6 +25,18 @@ export class CafesService {
       include: {
         photos: { orderBy: { order: 'asc' } },
         city: true,
+        menu: { select: { slug: true, isPublished: true } },
+        squads: {
+          where: { isPublic: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            emoji: true,
+            memberCount: true,
+            description: true,
+          },
+        },
         reviews: {
           take: 5,
           orderBy: { createdAt: 'desc' },
@@ -102,7 +115,12 @@ export class CafesService {
       ? `CLM-${randomBytes(4).toString('hex').toUpperCase()}`
       : undefined;
     return this.prisma.cafe.create({
-      data: { ...data, checkinCode, claimCode },
+      data: {
+        ...data,
+        checkinCode,
+        claimCode,
+        geohash: encodeGeohash(data.lat, data.lng, 7),
+      },
     });
   }
 

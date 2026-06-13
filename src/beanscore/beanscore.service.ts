@@ -12,6 +12,12 @@ const POINTS: Record<BeanScoreAction, number> = {
   DAILY_ACTIVE: 5,
   REFERRAL: 50,
   CHALLENGE_COMPLETE: 100,
+  BEAN: 10,
+  BEAN_MEDIA: 15,
+  BEAN_REPLY: 4,
+  BEAN_REACTION_RECEIVED: 2,
+  BEAN_REBEAN_RECEIVED: 8,
+  BEAN_POPULAR: 50,
 };
 
 const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 2000];
@@ -67,7 +73,18 @@ export class BeanScoreService {
 
   async claimDailyBonus(userId: string) {
     const day = new Date().toISOString().slice(0, 10);
-    return this.award(userId, BeanScoreAction.DAILY_ACTIVE, day);
+    const result = await this.award(userId, BeanScoreAction.DAILY_ACTIVE, day);
+    if (!result) {
+      // Already claimed today (idempotent) — report current standing, no award.
+      const profile = await this.getProfile(userId);
+      return {
+        claimed: false,
+        points: 0,
+        totalPoints: profile.totalPoints,
+        level: profile.level,
+      };
+    }
+    return { claimed: true, ...result };
   }
 
   async getProfile(userId: string) {
@@ -79,11 +96,24 @@ export class BeanScoreService {
     const nextThreshold =
       LEVEL_THRESHOLDS.find((t) => t > totalPoints) ??
       LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+
+    // When (if ever) the daily bonus was claimed today — drives the home card.
+    const today = new Date().toISOString().slice(0, 10);
+    const todayClaim = await this.prisma.beanScoreEvent.findFirst({
+      where: {
+        userId,
+        action: BeanScoreAction.DAILY_ACTIVE,
+        referenceId: today,
+      },
+      select: { createdAt: true },
+    });
+
     return {
       totalPoints,
       level,
       nextThreshold,
       pointsToNext: Math.max(0, nextThreshold - totalPoints),
+      dailyClaimedAt: todayClaim?.createdAt ?? null,
     };
   }
 
