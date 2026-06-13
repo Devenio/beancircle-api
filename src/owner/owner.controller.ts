@@ -1,12 +1,17 @@
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { OwnerService } from './owner.service';
 
 class ClaimCafeDto {
   @IsString()
+  @MinLength(3)
   @MaxLength(32)
-  claimCode: string;
+  @Matches(/^[A-Z0-9-]+$/, {
+    message:
+      'claimCode must contain only uppercase letters, digits, and hyphens',
+  })
+  claimCode: string | undefined;
 }
 
 class UpdateOwnerCafeDto {

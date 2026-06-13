@@ -96,9 +96,7 @@ export class PushService implements OnModuleInit {
               .delete({ where: { id: s.id } })
               .catch(() => undefined);
           } else {
-            this.logger.warn(
-              `push send failed (${statusCode ?? 'unknown'}) for ${s.id}`,
-            );
+            this.logger.warn(`push send failed (${statusCode ?? 'unknown'})`);
           }
         }
       }),

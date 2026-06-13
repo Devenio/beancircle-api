@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { ReportStatus } from '@prisma/client';
 import { IsEnum } from 'class-validator';
+import { Throttle } from '@nestjs/throttler';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { AdminService } from './admin.service';
 import { GiftsService } from '../gifts/gifts.service';
@@ -12,6 +13,7 @@ class UpdateReportDto {
 
 @Controller('admin')
 @UseGuards(AdminGuard)
+@Throttle({ default: { limit: 30, ttl: 60000 } })
 export class AdminController {
   constructor(
     private adminService: AdminService,
@@ -34,8 +36,8 @@ export class AdminController {
   }
 
   @Get('reports')
-  reports() {
-    return this.adminService.listReports();
+  reports(@Query('cursor') cursor?: string) {
+    return this.adminService.listReports(cursor);
   }
 
   @Get('checkins')

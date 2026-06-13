@@ -41,13 +41,19 @@ export class AdminService {
     });
   }
 
-  listReports() {
-    return this.prisma.report.findMany({
+  async listReports(cursor?: string, limit = 50) {
+    const take = Math.min(limit, 50);
+    const items = await this.prisma.report.findMany({
       include: {
         reporter: { select: { id: true, username: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
+    const hasMore = items.length > take;
+    const data = hasMore ? items.slice(0, take) : items;
+    return { data, nextCursor: hasMore ? data[data.length - 1]?.id : null };
   }
 
   listCheckins() {

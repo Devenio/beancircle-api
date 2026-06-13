@@ -69,14 +69,7 @@ export class OwnerService {
     await this.assertOwner(userId, cafeId);
     const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const [
-      cafe,
-      checkins30,
-      checkinsTotal,
-      reviews30,
-      recentCheckins,
-      stampCount,
-    ] = await Promise.all([
+    const results = await Promise.allSettled([
       this.prisma.cafe.findUniqueOrThrow({
         where: { id: cafeId },
         select: {
@@ -108,6 +101,15 @@ export class OwnerService {
       }),
       this.prisma.stamp.count({ where: { cafeId } }),
     ]);
+
+    // The first query (cafe lookup) is critical — rethrow if it failed.
+    if (results[0].status === 'rejected') throw results[0].reason;
+    const { value: cafe } = results[0];
+    const checkins30 = results[1].status === 'fulfilled' ? results[1].value : 0;
+    const checkinsTotal = results[2].status === 'fulfilled' ? results[2].value : 0;
+    const reviews30 = results[3].status === 'fulfilled' ? results[3].value : 0;
+    const recentCheckins = results[4].status === 'fulfilled' ? results[4].value : [];
+    const stampCount = results[5].status === 'fulfilled' ? results[5].value : 0;
 
     return {
       cafe,

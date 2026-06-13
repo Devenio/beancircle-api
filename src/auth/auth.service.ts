@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -37,6 +38,8 @@ type TokenBundle = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
@@ -81,6 +84,7 @@ export class AuthService {
   ) {
     const stored = await this.redis.getOtp(phone);
     if (!stored || stored !== code) {
+      this.logger.warn(`Failed OTP attempt for ${phone.slice(0, 4)}****`);
       throw new UnauthorizedException('Invalid OTP');
     }
     await this.redis.delOtp(phone);
@@ -164,10 +168,12 @@ export class AuthService {
       },
     });
     if (!record) {
+      this.logger.warn('Refresh attempt with unknown/expired token');
       throw new UnauthorizedException('Invalid refresh token');
     }
     const valid = await bcrypt.compare(parsed.secret, record.tokenHash);
     if (!valid) {
+      this.logger.warn(`Refresh token hash mismatch for record ${record.id}`);
       throw new UnauthorizedException('Invalid refresh token');
     }
 
