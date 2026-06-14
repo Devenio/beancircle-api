@@ -23,20 +23,9 @@ function getSocketData(client: Socket): SocketAuthData {
   return client.data as SocketAuthData;
 }
 
-// In production, lock the realtime CORS to the configured frontend origin(s).
-// In dev, reflect the request origin so the handshake succeeds when the app is
-// opened from a LAN IP or a phone over a tunnel (the frontend proxies
-// /socket.io to here and forwards the browser's Origin header).
-const realtimeCorsOrigin =
-  process.env.NODE_ENV === 'production'
-    ? (process.env.FRONTEND_URL ?? 'http://localhost:3000')
-        .split(',')
-        .map((o) => o.trim())
-    : true;
-
 @WebSocketGateway({
   cors: {
-    origin: realtimeCorsOrigin,
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
     credentials: true,
   },
 })

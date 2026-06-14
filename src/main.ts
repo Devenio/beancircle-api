@@ -13,15 +13,7 @@ async function bootstrap() {
   app.use(helmet());
   app.setGlobalPrefix('api/v1');
   app.enableCors({
-    // In production, lock to the configured frontend origin(s). In dev, reflect
-    // the request origin so the app is reachable from a LAN IP or a phone over
-    // a tunnel (the frontend's same-origin proxy normally hides this, but a
-    // forwarded Origin header must still be accepted).
-    origin: isProd
-      ? (config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000')
-          .split(',')
-          .map((o) => o.trim())
-      : true,
+    origin: config.get('FRONTEND_URL') ?? 'http://localhost:3000',
     credentials: true,
   });
   app.useGlobalPipes(
