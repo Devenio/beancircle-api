@@ -706,36 +706,37 @@ model Cafe {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  city               City                @relation(fields: [cityId], references: [id])
-  country            Country             @relation(fields: [countryId], references: [id])
-  photos             CafePhoto[]
-  posts              Post[]
-  reviews            Review[]
-  checkins           Checkin[]
-  followers          CafeFollow[]
-  favorites          FavoriteCafe[]
-  voucherRedemptions VoucherRedemption[]
-  stamps             Stamp[]
-  workReports        WorkReport[]
-  staff              CafeStaff[]
-  staffInvites       CafeStaffInvite[]
-  auditLogs          AuditLog[]
-  tables             CafeTable[]
-  qrCodes            QrCode[]
-  qrScans            QrScan[]
-  customers          CafeCustomer[]
-  loyaltyPrograms    LoyaltyProgram[]
-  announcements      Announcement[]
-  dailyStats         CafeDailyStat[]
-  createdBy          User?               @relation("CafeCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  events             CommunityEvent[]
-  squads             Squad[]
-  collectibleCard    CollectibleCard?
-  activities         FriendActivity[]
-  dailyDraws         CafeDailyDraw[]
-  menu               CafeMenu?
-  beans              Bean[]
-  featureFlags       CafeFeatureFlag[]
+  city                City                     @relation(fields: [cityId], references: [id])
+  country             Country                  @relation(fields: [countryId], references: [id])
+  photos              CafePhoto[]
+  posts               Post[]
+  reviews             Review[]
+  checkins            Checkin[]
+  followers           CafeFollow[]
+  favorites           FavoriteCafe[]
+  voucherRedemptions  VoucherRedemption[]
+  stamps              Stamp[]
+  workReports         WorkReport[]
+  staff               CafeStaff[]
+  staffInvites        CafeStaffInvite[]
+  auditLogs           AuditLog[]
+  tables              CafeTable[]
+  qrCodes             QrCode[]
+  qrScans             QrScan[]
+  customers           CafeCustomer[]
+  loyaltyPrograms     LoyaltyProgram[]
+  announcements       Announcement[]
+  dailyStats          CafeDailyStat[]
+  createdBy           User?                    @relation("CafeCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  events              CommunityEvent[]
+  squads              Squad[]
+  collectibleCard     CollectibleCard?
+  activities          FriendActivity[]
+  dailyDraws          CafeDailyDraw[]
+  menu                CafeMenu?
+  beans               Bean[]
+  featureFlags        CafeFeatureFlag[]
+  templateAssignments MenuTemplateAssignment[]
 
   @@index([cityId])
   @@index([cityId, avgRating])
@@ -754,20 +755,22 @@ model CafePhoto {
 }
 
 model CafeMenu {
-  id              String         @id @default(uuid())
-  cafeId          String         @unique
-  slug            String         @unique
-  welcomeTitle    String?
-  welcomeMessage  String?
-  welcomeImageUrl String?
-  accentColor     String         @default("#2C1810")
-  theme           MenuTheme      @default(MINIMAL)
-  themeConfig     Json?
-  isPublished     Boolean        @default(false)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  cafe            Cafe           @relation(fields: [cafeId], references: [id], onDelete: Cascade)
-  categories      MenuCategory[]
+  id               String         @id @default(uuid())
+  cafeId           String         @unique
+  slug             String         @unique
+  welcomeTitle     String?
+  welcomeMessage   String?
+  welcomeImageUrl  String?
+  accentColor      String         @default("#2C1810")
+  theme            MenuTheme      @default(MINIMAL)
+  themeConfig      Json?
+  isPublished      Boolean        @default(false)
+  activeTemplateId String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  cafe             Cafe           @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  activeTemplate   MenuTemplate?  @relation("ActiveTemplate", fields: [activeTemplateId], references: [id], onDelete: SetNull)
+  categories       MenuCategory[]
 
   @@index([slug])
 }
@@ -1967,16 +1970,36 @@ model CafeFeatureFlag {
 
 /// A reusable menu the super admin builds once and can clone onto any cafe.
 model MenuTemplate {
-  id          String                 @id @default(uuid())
-  name        String
-  description String?
-  accentColor String                 @default("#2C1810")
-  theme       MenuTheme              @default(MINIMAL)
-  themeConfig Json?
-  createdById String?
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  categories  MenuTemplateCategory[]
+  id              String                   @id @default(uuid())
+  name            String
+  description     String?
+  previewImageUrl String?
+  welcomeTitle    String?
+  welcomeMessage  String?
+  accentColor     String                   @default("#2C1810")
+  theme           MenuTheme                @default(MINIMAL)
+  themeConfig     Json?
+  createdById     String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  categories      MenuTemplateCategory[]
+  assignments     MenuTemplateAssignment[]
+  activeOnMenus   CafeMenu[]               @relation("ActiveTemplate")
+}
+
+/// Grants a cafe access to a template (WordPress-style "available theme").
+/// A cafe can be assigned many templates; one may be set active on its menu.
+model MenuTemplateAssignment {
+  id           String       @id @default(uuid())
+  templateId   String
+  cafeId       String
+  assignedById String?
+  createdAt    DateTime     @default(now())
+  template     MenuTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  cafe         Cafe         @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, cafeId])
+  @@index([cafeId])
 }
 
 model MenuTemplateCategory {

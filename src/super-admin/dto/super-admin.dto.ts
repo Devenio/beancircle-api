@@ -82,6 +82,9 @@ export class TemplateCategoryDto {
 export class UpsertTemplateDto {
   @IsString() name: string;
   @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() previewImageUrl?: string;
+  @IsOptional() @IsString() welcomeTitle?: string;
+  @IsOptional() @IsString() welcomeMessage?: string;
   @IsOptional() @IsString() accentColor?: string;
   @IsOptional() @IsEnum(MenuTheme) theme?: MenuTheme;
   @IsOptional() themeConfig?: unknown;
@@ -97,4 +100,13 @@ export class ApplyTemplateDto {
   @IsOptional() @IsString() slug?: string;
   // Publish the menu immediately after applying.
   @IsOptional() @IsBoolean() publish?: boolean;
+  // When true (default) also clone the template's starter categories/items.
+  // When false, only the design (theme/colors/welcome) is applied.
+  @IsOptional() @IsBoolean() includeContent?: boolean;
+}
+
+export class AssignTemplateDto {
+  @IsArray()
+  @IsString({ each: true })
+  cafeIds: string[];
 }

@@ -31,6 +31,7 @@ import { MenuTemplatesService } from './menu-templates.service';
 import { UsersAdminService } from './users.service';
 import {
   ApplyTemplateDto,
+  AssignTemplateDto,
   SetCafeFlagDto,
   SetGlobalFlagDto,
   UpdateCafeDto,
@@ -181,6 +182,34 @@ export class SuperAdminController {
   @Delete('menu-templates/:id')
   deleteTemplate(@CurrentUser() actor: Actor, @Param('id') id: string) {
     return this.templates.remove(actor.id, id);
+  }
+
+  @Get('menu-templates/:id/assignments')
+  templateAssignments(@Param('id') id: string) {
+    return this.templates.listAssignments(id);
+  }
+
+  @Post('menu-templates/:id/assign')
+  assignTemplate(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: AssignTemplateDto,
+  ) {
+    return this.templates.assign(actor.id, id, dto.cafeIds);
+  }
+
+  @Delete('menu-templates/:id/assign/:cafeId')
+  unassignTemplate(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Param('cafeId') cafeId: string,
+  ) {
+    return this.templates.unassign(actor.id, id, cafeId);
+  }
+
+  @Get('cafes/:cafeId/templates')
+  cafeTemplates(@Param('cafeId') cafeId: string) {
+    return this.templates.templatesForCafe(cafeId);
   }
 
   @Post('cafes/:cafeId/menu/apply-template/:templateId')

@@ -21,7 +21,9 @@ export class MenuTemplatesService {
   list() {
     return this.prisma.menuTemplate.findMany({
       orderBy: { updatedAt: 'desc' },
-      include: { _count: { select: { categories: true } } },
+      include: {
+        _count: { select: { categories: true, assignments: true } },
+      },
     });
   }
 
@@ -39,6 +41,9 @@ export class MenuTemplatesService {
     const base = {
       name: dto.name,
       description: dto.description ?? null,
+      previewImageUrl: dto.previewImageUrl ?? null,
+      welcomeTitle: dto.welcomeTitle ?? null,
+      welcomeMessage: dto.welcomeMessage ?? null,
       accentColor: dto.accentColor ?? '#2C1810',
       theme: dto.theme ?? undefined,
       themeConfig: (dto.themeConfig ?? undefined) as
@@ -130,17 +135,26 @@ export class MenuTemplatesService {
       dto.slug?.trim().toLowerCase() ||
       existing?.slug ||
       (await this.availableSlug(this.slugify(cafe.name)));
+    const includeContent = dto.includeContent ?? true;
+
+    // Design that the cafe's live menu adopts from the template.
+    const design = {
+      accentColor: tpl.accentColor,
+      theme: tpl.theme,
+      themeConfig: (tpl.themeConfig ?? undefined) as
+        | Prisma.InputJsonValue
+        | undefined,
+      activeTemplateId: tpl.id,
+      ...(tpl.welcomeTitle ? { welcomeTitle: tpl.welcomeTitle } : {}),
+      ...(tpl.welcomeMessage ? { welcomeMessage: tpl.welcomeMessage } : {}),
+    };
 
     const result = await this.prisma.$transaction(async (tx) => {
       const menu = existing
         ? await tx.cafeMenu.update({
             where: { cafeId },
             data: {
-              accentColor: tpl.accentColor,
-              theme: tpl.theme,
-              themeConfig: (tpl.themeConfig ?? undefined) as
-                | Prisma.InputJsonValue
-                | undefined,
+              ...design,
               ...(dto.publish !== undefined ? { isPublished: dto.publish } : {}),
             },
           })
@@ -148,41 +162,51 @@ export class MenuTemplatesService {
             data: {
               cafeId,
               slug,
-              welcomeTitle: cafe.name,
+              welcomeTitle: tpl.welcomeTitle ?? cafe.name,
+              welcomeMessage: tpl.welcomeMessage ?? null,
               accentColor: tpl.accentColor,
               theme: tpl.theme,
               themeConfig: (tpl.themeConfig ?? undefined) as
                 | Prisma.InputJsonValue
                 | undefined,
+              activeTemplateId: tpl.id,
               isPublished: dto.publish ?? false,
             },
           });
 
-      await tx.menuCategory.deleteMany({ where: { menuId: menu.id } });
+      // Applying a template implies the cafe is allowed to use it.
+      await tx.menuTemplateAssignment.upsert({
+        where: { templateId_cafeId: { templateId: tpl.id, cafeId } },
+        create: { templateId: tpl.id, cafeId, assignedById: actorId },
+        update: {},
+      });
 
-      for (const cat of tpl.categories) {
-        const category = await tx.menuCategory.create({
-          data: { menuId: menu.id, name: cat.name, order: cat.order },
-        });
-        if (cat.items.length) {
-          await tx.menuItem.createMany({
-            data: cat.items.map((item) => ({
-              categoryId: category.id,
-              name: item.name,
-              description: item.description,
-              price: item.price,
-              discountPrice: item.discountPrice,
-              calories: item.calories,
-              ingredients: item.ingredients,
-              allergens: item.allergens,
-              prepTimeMin: item.prepTimeMin,
-              imageUrl: item.imageUrl,
-              images: item.images,
-              videoUrl: item.videoUrl,
-              isAvailable: item.isAvailable,
-              order: item.order,
-            })),
+      if (includeContent) {
+        await tx.menuCategory.deleteMany({ where: { menuId: menu.id } });
+        for (const cat of tpl.categories) {
+          const category = await tx.menuCategory.create({
+            data: { menuId: menu.id, name: cat.name, order: cat.order },
           });
+          if (cat.items.length) {
+            await tx.menuItem.createMany({
+              data: cat.items.map((item) => ({
+                categoryId: category.id,
+                name: item.name,
+                description: item.description,
+                price: item.price,
+                discountPrice: item.discountPrice,
+                calories: item.calories,
+                ingredients: item.ingredients,
+                allergens: item.allergens,
+                prepTimeMin: item.prepTimeMin,
+                imageUrl: item.imageUrl,
+                images: item.images,
+                videoUrl: item.videoUrl,
+                isAvailable: item.isAvailable,
+                order: item.order,
+              })),
+            });
+          }
         }
       }
 
@@ -191,8 +215,82 @@ export class MenuTemplatesService {
 
     await this.audit.log(actorId, 'menuTemplate.apply', 'cafe', cafeId, {
       templateId,
+      includeContent,
     });
     return result;
+  }
+
+  // ---------------- Assignment (WordPress-style availability) ----------------
+
+  /** Assign a template to one or more cafes, granting them access to it. */
+  async assign(actorId: string, templateId: string, cafeIds: string[]) {
+    await this.get(templateId);
+    for (const cafeId of cafeIds) {
+      await this.prisma.menuTemplateAssignment
+        .upsert({
+          where: { templateId_cafeId: { templateId, cafeId } },
+          create: { templateId, cafeId, assignedById: actorId },
+          update: {},
+        })
+        .catch(() => undefined); // ignore unknown cafe ids
+    }
+    await this.audit.log(actorId, 'menuTemplate.assign', 'menuTemplate', templateId, {
+      cafeIds,
+    });
+    return this.listAssignments(templateId);
+  }
+
+  async unassign(actorId: string, templateId: string, cafeId: string) {
+    await this.prisma.menuTemplateAssignment
+      .delete({ where: { templateId_cafeId: { templateId, cafeId } } })
+      .catch(() => undefined);
+    // If this template was active on that cafe's menu, detach it.
+    await this.prisma.cafeMenu
+      .updateMany({
+        where: { cafeId, activeTemplateId: templateId },
+        data: { activeTemplateId: null },
+      })
+      .catch(() => undefined);
+    await this.audit.log(actorId, 'menuTemplate.unassign', 'menuTemplate', templateId, {
+      cafeId,
+    });
+    return this.listAssignments(templateId);
+  }
+
+  /** Cafes a template is assigned to, marking which one has it active. */
+  async listAssignments(templateId: string) {
+    const rows = await this.prisma.menuTemplateAssignment.findMany({
+      where: { templateId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        cafe: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            menu: { select: { activeTemplateId: true, isPublished: true } },
+          },
+        },
+      },
+    });
+    return rows.map((r) => ({
+      cafeId: r.cafeId,
+      name: r.cafe.name,
+      slug: r.cafe.slug,
+      assignedAt: r.createdAt,
+      active: r.cafe.menu?.activeTemplateId === templateId,
+      published: r.cafe.menu?.isPublished ?? false,
+    }));
+  }
+
+  /** Templates available to a cafe (for cafe-os theme switching). */
+  async templatesForCafe(cafeId: string) {
+    const rows = await this.prisma.menuTemplateAssignment.findMany({
+      where: { cafeId },
+      orderBy: { createdAt: 'desc' },
+      include: { template: true },
+    });
+    return rows.map((r) => r.template);
   }
 
   private slugify(name: string) {
