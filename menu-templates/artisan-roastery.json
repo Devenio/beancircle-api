@@ -1,0 +1,74 @@
+{
+  "name": "Artisan Roastery",
+  "description": "Warm, editorial layout for specialty roasters. Gold-on-charcoal luxury theme.",
+  "theme": "LUXURY",
+  "accentColor": "#C8A24B",
+  "welcomeTitle": "Artisan Roastery",
+  "welcomeMessage": "Single-origin coffee, roasted in-house every morning.",
+  "categories": [
+    {
+      "name": "Espresso Bar",
+      "items": [
+        {
+          "name": "Espresso",
+          "description": "Double shot, 18g, 30s extraction",
+          "price": 4500,
+          "calories": 5,
+          "ingredients": ["arabica"],
+          "prepTimeMin": 2
+        },
+        {
+          "name": "Cortado",
+          "description": "Equal parts espresso and steamed milk",
+          "price": 5500,
+          "calories": 70,
+          "prepTimeMin": 3
+        },
+        {
+          "name": "Flat White",
+          "description": "Velvety microfoam over a double ristretto",
+          "price": 6500,
+          "calories": 120,
+          "prepTimeMin": 3
+        }
+      ]
+    },
+    {
+      "name": "Filter & Brew",
+      "items": [
+        {
+          "name": "V60 Pour-Over",
+          "description": "Rotating single origin, ask your barista",
+          "price": 7000,
+          "calories": 5,
+          "prepTimeMin": 5
+        },
+        {
+          "name": "Cold Brew",
+          "description": "18-hour steep, served over ice",
+          "price": 6500,
+          "calories": 15,
+          "prepTimeMin": 1
+        }
+      ]
+    },
+    {
+      "name": "Pastries",
+      "items": [
+        {
+          "name": "Almond Croissant",
+          "description": "Baked daily, dusted with sugar",
+          "price": 5000,
+          "calories": 410,
+          "allergens": ["gluten", "nuts", "dairy"]
+        },
+        {
+          "name": "Pistachio Financier",
+          "price": 4500,
+          "calories": 230,
+          "allergens": ["gluten", "nuts", "dairy", "egg"]
+        }
+      ]
+    }
+  ]
+}

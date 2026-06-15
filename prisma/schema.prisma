@@ -1979,6 +1979,12 @@ model MenuTemplate {
   accentColor     String                   @default("#2C1810")
   theme           MenuTheme                @default(MINIMAL)
   themeConfig     Json?
+  /// Origin of the template: "custom" for ones built in the admin panel,
+  /// "file" for ones imported from a file dropped in the project directory.
+  source          String                   @default("custom")
+  /// Stable key of the source file (its filename without extension) when
+  /// imported from disk. Lets re-imports update in place instead of duplicating.
+  sourceKey       String?                  @unique
   createdById     String?
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt

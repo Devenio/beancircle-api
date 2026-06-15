@@ -1,0 +1,39 @@
+{
+  "name": "Neon Night",
+  "description": "High-contrast custom theme for late-night dessert and bubble-tea spots.",
+  "theme": "CUSTOM",
+  "accentColor": "#E935C1",
+  "themeConfig": {
+    "bg": "#07020F",
+    "surface": "#120A22",
+    "text": "#F2EBFF",
+    "muted": "#9D8FC0",
+    "accent": "#E935C1",
+    "onAccent": "#FFFFFF",
+    "chip": "#1D1233",
+    "border": "rgba(233,53,193,0.35)",
+    "headingFont": "mono",
+    "radius": "1.25rem",
+    "cardStyle": "outline",
+    "heroTint": "#0B0418"
+  },
+  "welcomeTitle": "Neon Night",
+  "welcomeMessage": "Open late. Lit different.",
+  "categories": [
+    {
+      "name": "Bubble Tea",
+      "items": [
+        { "name": "Brown Sugar Boba", "price": 7500, "calories": 380 },
+        { "name": "Taro Milk Tea", "price": 7000, "calories": 320 },
+        { "name": "Matcha Latte", "price": 7500, "calories": 290 }
+      ]
+    },
+    {
+      "name": "Desserts",
+      "items": [
+        { "name": "Mochi Trio", "price": 6000, "allergens": ["dairy"] },
+        { "name": "Basque Cheesecake", "price": 8000, "allergens": ["gluten", "dairy", "egg"] }
+      ]
+    }
+  ]
+}

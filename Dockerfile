@@ -18,5 +18,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma ./prisma
+# Drop-in menu template files (imported/assigned from the admin panel).
+COPY --from=build /app/menu-templates ./menu-templates
 EXPOSE 3001
 CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/main.js"]

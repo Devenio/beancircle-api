@@ -27,6 +27,7 @@ import {
 import { AnalyticsService } from './analytics.service';
 import { AuditService } from './audit.service';
 import { CafesAdminService } from './cafes.service';
+import { MenuFileTemplatesService } from './menu-file-templates.service';
 import { MenuTemplatesService } from './menu-templates.service';
 import { UsersAdminService } from './users.service';
 import {
@@ -51,6 +52,7 @@ export class SuperAdminController {
     private users: UsersAdminService,
     private cafes: CafesAdminService,
     private templates: MenuTemplatesService,
+    private fileTemplates: MenuFileTemplatesService,
     private analytics: AnalyticsService,
     private audit: AuditService,
     private menus: MenusService,
@@ -155,6 +157,41 @@ export class SuperAdminController {
   @Get('menu-templates')
   listTemplates() {
     return this.templates.list();
+  }
+
+  // ---- File templates (drop-in folder) ----
+  // Declared before the `:id` routes so `/files` isn't matched as an id.
+
+  @Get('menu-templates/files')
+  listFileTemplates() {
+    return this.fileTemplates.list();
+  }
+
+  @Get('menu-templates/files/:key')
+  getFileTemplate(@Param('key') key: string) {
+    return this.fileTemplates.getOne(key);
+  }
+
+  @Post('menu-templates/files/import-all')
+  importAllFileTemplates(@CurrentUser() actor: Actor) {
+    return this.fileTemplates.importAll(actor.id);
+  }
+
+  @Post('menu-templates/files/:key/import')
+  importFileTemplate(
+    @CurrentUser() actor: Actor,
+    @Param('key') key: string,
+  ) {
+    return this.fileTemplates.import(actor.id, key);
+  }
+
+  @Post('menu-templates/files/:key/assign')
+  importAndAssignFileTemplate(
+    @CurrentUser() actor: Actor,
+    @Param('key') key: string,
+    @Body() dto: AssignTemplateDto,
+  ) {
+    return this.fileTemplates.importAndAssign(actor.id, key, dto.cafeIds);
   }
 
   @Get('menu-templates/:id')

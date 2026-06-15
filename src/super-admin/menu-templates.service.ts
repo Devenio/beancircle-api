@@ -1,8 +1,45 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MenuTheme, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from './audit.service';
 import { ApplyTemplateDto, UpsertTemplateDto } from './dto/super-admin.dto';
+
+/** A single menu item parsed from a template file. */
+export type FileTemplateItem = {
+  name: string;
+  description?: string | null;
+  price: number;
+  discountPrice?: number | null;
+  calories?: number | null;
+  ingredients?: string[];
+  allergens?: string[];
+  prepTimeMin?: number | null;
+  imageUrl?: string | null;
+  images?: string[];
+  videoUrl?: string | null;
+  isAvailable?: boolean;
+  order?: number;
+};
+
+export type FileTemplateCategory = {
+  name: string;
+  order?: number;
+  items?: FileTemplateItem[];
+};
+
+/** A normalized, validated template parsed from a file on disk. */
+export type FileTemplateInput = {
+  key: string;
+  name: string;
+  description?: string | null;
+  previewImageUrl?: string | null;
+  welcomeTitle?: string | null;
+  welcomeMessage?: string | null;
+  accentColor?: string;
+  theme?: MenuTheme;
+  themeConfig?: unknown;
+  categories?: FileTemplateCategory[];
+};
 
 const templateInclude = {
   categories: {
@@ -59,34 +96,7 @@ export class MenuTemplatesService {
           });
 
       if (dto.categories) {
-        await tx.menuTemplateCategory.deleteMany({
-          where: { templateId: tpl.id },
-        });
-        for (const [ci, cat] of dto.categories.entries()) {
-          const category = await tx.menuTemplateCategory.create({
-            data: { templateId: tpl.id, name: cat.name, order: cat.order ?? ci },
-          });
-          if (cat.items?.length) {
-            await tx.menuTemplateItem.createMany({
-              data: cat.items.map((item, ii) => ({
-                categoryId: category.id,
-                name: item.name,
-                description: item.description ?? null,
-                price: item.price,
-                discountPrice: item.discountPrice ?? null,
-                calories: item.calories ?? null,
-                ingredients: item.ingredients ?? [],
-                allergens: item.allergens ?? [],
-                prepTimeMin: item.prepTimeMin ?? null,
-                imageUrl: item.imageUrl ?? null,
-                images: item.images ?? [],
-                videoUrl: item.videoUrl ?? null,
-                isAvailable: item.isAvailable ?? true,
-                order: item.order ?? ii,
-              })),
-            });
-          }
-        }
+        await this.replaceCategories(tx, tpl.id, dto.categories);
       }
 
       return tx.menuTemplate.findUniqueOrThrow({
@@ -102,6 +112,88 @@ export class MenuTemplatesService {
       result.id,
     );
     return result;
+  }
+
+  /**
+   * Import a template parsed from a file dropped in the project directory.
+   * Keyed by `sourceKey` so re-importing the same file updates it in place
+   * instead of creating duplicates. Marks the template as `source: 'file'`.
+   */
+  async importFromFile(actorId: string, file: FileTemplateInput) {
+    const base = {
+      name: file.name,
+      description: file.description ?? null,
+      previewImageUrl: file.previewImageUrl ?? null,
+      welcomeTitle: file.welcomeTitle ?? null,
+      welcomeMessage: file.welcomeMessage ?? null,
+      accentColor: file.accentColor ?? '#2C1810',
+      theme: file.theme ?? undefined,
+      themeConfig: (file.themeConfig ?? undefined) as
+        | Prisma.InputJsonValue
+        | undefined,
+      source: 'file',
+    };
+
+    const existing = await this.prisma.menuTemplate.findUnique({
+      where: { sourceKey: file.key },
+      select: { id: true },
+    });
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const tpl = existing
+        ? await tx.menuTemplate.update({ where: { id: existing.id }, data: base })
+        : await tx.menuTemplate.create({
+            data: { ...base, sourceKey: file.key, createdById: actorId },
+          });
+      await this.replaceCategories(tx, tpl.id, file.categories ?? []);
+      return tx.menuTemplate.findUniqueOrThrow({
+        where: { id: tpl.id },
+        include: templateInclude,
+      });
+    });
+
+    await this.audit.log(
+      actorId,
+      existing ? 'menuTemplate.fileReimport' : 'menuTemplate.fileImport',
+      'menuTemplate',
+      result.id,
+      { sourceKey: file.key },
+    );
+    return result;
+  }
+
+  /** Delete every category of a template and recreate them from the input. */
+  private async replaceCategories(
+    tx: Prisma.TransactionClient,
+    templateId: string,
+    categories: FileTemplateCategory[],
+  ) {
+    await tx.menuTemplateCategory.deleteMany({ where: { templateId } });
+    for (const [ci, cat] of categories.entries()) {
+      const category = await tx.menuTemplateCategory.create({
+        data: { templateId, name: cat.name, order: cat.order ?? ci },
+      });
+      if (cat.items?.length) {
+        await tx.menuTemplateItem.createMany({
+          data: cat.items.map((item, ii) => ({
+            categoryId: category.id,
+            name: item.name,
+            description: item.description ?? null,
+            price: item.price,
+            discountPrice: item.discountPrice ?? null,
+            calories: item.calories ?? null,
+            ingredients: item.ingredients ?? [],
+            allergens: item.allergens ?? [],
+            prepTimeMin: item.prepTimeMin ?? null,
+            imageUrl: item.imageUrl ?? null,
+            images: item.images ?? [],
+            videoUrl: item.videoUrl ?? null,
+            isAvailable: item.isAvailable ?? true,
+            order: item.order ?? ii,
+          })),
+        });
+      }
+    }
   }
 
   async remove(actorId: string, id: string) {
