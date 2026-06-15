@@ -1,8 +1,12 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireFeature } from '../common/decorators/feature-flag.decorator';
+import { FeatureFlagGuard } from '../common/guards/feature-flag.guard';
 import { CommunityService } from './community.service';
 
 @Controller('community')
+@RequireFeature('community')
+@UseGuards(FeatureFlagGuard)
 export class CommunityController {
   constructor(private community: CommunityService) {}
 

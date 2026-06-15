@@ -6,10 +6,13 @@ import {
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { EventRsvpStatus, EventType } from '@prisma/client';
 import { IsEnum } from 'class-validator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireFeature } from '../common/decorators/feature-flag.decorator';
+import { FeatureFlagGuard } from '../common/guards/feature-flag.guard';
 import { CreateEventDto, SetReminderDto } from './dto/event.dto';
 import { EventsService } from './events.service';
 
@@ -19,6 +22,8 @@ class RsvpDto {
 }
 
 @Controller('events')
+@RequireFeature('events')
+@UseGuards(FeatureFlagGuard)
 export class EventsController {
   constructor(private events: EventsService) {}
 

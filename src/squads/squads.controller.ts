@@ -6,13 +6,18 @@ import {
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { SquadCategory } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireFeature } from '../common/decorators/feature-flag.decorator';
+import { FeatureFlagGuard } from '../common/guards/feature-flag.guard';
 import { CreateSquadDto, SquadMessageDto } from './dto/squad.dto';
 import { SquadsService } from './squads.service';
 
 @Controller('squads')
+@RequireFeature('squads')
+@UseGuards(FeatureFlagGuard)
 export class SquadsController {
   constructor(private squads: SquadsService) {}
 

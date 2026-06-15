@@ -10,7 +10,9 @@ import {
 import { IsInt, IsString, Min } from 'class-validator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireFeature } from '../common/decorators/feature-flag.decorator';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { FeatureFlagGuard } from '../common/guards/feature-flag.guard';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { GiftsService } from './gifts.service';
 
@@ -29,6 +31,8 @@ class RedeemDto {
 }
 
 @Controller('gifts')
+@RequireFeature('gifts')
+@UseGuards(FeatureFlagGuard)
 export class GiftsController {
   constructor(private giftsService: GiftsService) {}
 

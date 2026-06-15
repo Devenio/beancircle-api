@@ -17,6 +17,8 @@ import { ChatModule } from './chat/chat.module';
 import { CheckinsModule } from './checkins/checkins.module';
 import { CommentsModule } from './comments/comments.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
+import { SuperAdminModule } from './super-admin/super-admin.module';
 import { BeanScoreModule } from './beanscore/beanscore.module';
 import { CommunityModule } from './community/community.module';
 import { DiscoverModule } from './discover/discover.module';
@@ -99,6 +101,8 @@ import { UsersModule } from './users/users.module';
     AdminModule,
     UploadsModule,
     RealtimeModule,
+    FeatureFlagsModule,
+    SuperAdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

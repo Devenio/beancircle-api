@@ -6,13 +6,13 @@ import {
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 
+/** Restricts a route to platform super admins. */
 @Injectable()
-export class AdminGuard implements CanActivate {
+export class SuperAdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const { user } = context.switchToHttp().getRequest();
-    const allowed: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
-    if (!user || !allowed.includes(user.role)) {
-      throw new ForbiddenException('Admin access required');
+    if (!user || user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Super admin access required');
     }
     return true;
   }
