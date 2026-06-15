@@ -266,6 +266,9 @@ export class BeansService {
     if (original.rebeanOfId) {
       throw new BadRequestException('ReBean the original Bean instead');
     }
+    if (original.authorId === userId) {
+      throw new BadRequestException('Cannot ReBean your own Bean');
+    }
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         const r = await tx.bean.create({
