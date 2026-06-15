@@ -177,6 +177,7 @@ enum BadgeCode {
   EXPLORER
   SOCIAL_BUTTERFLY
   NETWORK_BUILDER
+  FIRST_SIP
 }
 
 enum FriendRequestStatus {
@@ -208,6 +209,13 @@ enum InterestSlug {
   MUSIC
   GAMING
   TECH
+  PROGRAMMING
+  DESIGN
+  BOOKS
+  CRYPTO
+  TRADING
+  PHOTOGRAPHY
+  TRAVEL
 }
 
 enum RewardType {
@@ -363,6 +371,9 @@ model User {
   name             String?
   bio              String?
   avatarUrl        String?
+  favoriteCoffee   String?
+  website          String?
+  socialLinks      Json?
   cityId           String?
   countryId        String?
   role             UserRole   @default(USER)
@@ -460,6 +471,9 @@ model User {
   discoveredInDaily      DailyDiscovery[]         @relation("DailyDiscovered")
   pushSubscriptions      PushSubscription[]
   adminAuditLogs         AdminAuditLog[]
+  onboarding             OnboardingProgress?
+  beanAvatar             BeanAvatar?
+  onboardingEvents       OnboardingEvent[]
 }
 
 /// A browser Web Push subscription (one row per device/endpoint).
@@ -2054,4 +2068,54 @@ model AdminAuditLog {
 
   @@index([createdAt])
   @@index([actorId, createdAt])
+}
+
+/// Per-user state of the multi-step activation onboarding. 1:1 with User.
+/// `completedSteps`/`skippedSteps` hold step keys (welcome, interests, avatar,
+/// circle, firstPost, cafe, achievement, profile, invite). `stepTimings` maps
+/// a step key to milliseconds spent, for the funnel/time-spent analytics.
+model OnboardingProgress {
+  userId         String    @id
+  currentStep    String    @default("welcome")
+  completedSteps String[]  @default([])
+  skippedSteps   String[]  @default([])
+  stepTimings    Json      @default("{}")
+  startedAt      DateTime  @default(now())
+  lastActiveAt   DateTime  @default(now())
+  completedAt    DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Customizable "bean" avatar. Stores discrete option keys; the client renders
+/// the layered SVG. 1:1 with User.
+model BeanAvatar {
+  userId    String   @id
+  bg        String   @default("crema")
+  skin      String   @default("roast")
+  hair      String   @default("none")
+  glasses   String   @default("none")
+  beard     String   @default("none")
+  outfit    String   @default("apron")
+  accessory String   @default("none")
+  coffeeCup String   @default("latte")
+  isDefault Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Append-only funnel events for the onboarding flow (step viewed/skipped/
+/// completed + time spent). Powers conversion + drop-off metrics.
+model OnboardingEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  step        String
+  type        String
+  timeSpentMs Int?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, step])
+  @@index([step, type])
+  @@index([createdAt])
 }

@@ -33,6 +33,7 @@ import { OwnerModule } from './owner/owner.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { EventsModule } from './events/events.module';
 import { GrowthModule } from './growth/growth.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 import { GiftsModule } from './gifts/gifts.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { ScanModule } from './scan/scan.module';
@@ -96,6 +97,7 @@ import { UsersModule } from './users/users.module';
     ChallengesModule,
     EventsModule,
     GrowthModule,
+    OnboardingModule,
     ReportsModule,
     BugReportsModule,
     AdminModule,

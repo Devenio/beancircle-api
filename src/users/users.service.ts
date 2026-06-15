@@ -17,6 +17,9 @@ const userSelect = {
   name: true,
   bio: true,
   avatarUrl: true,
+  favoriteCoffee: true,
+  website: true,
+  socialLinks: true,
   cityId: true,
   countryId: true,
   role: true,
@@ -38,7 +41,19 @@ export class UsersService {
   getMe(userId: string) {
     return this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { ...userSelect, phone: true, email: true },
+      select: {
+        ...userSelect,
+        phone: true,
+        email: true,
+        onboarding: {
+          select: {
+            currentStep: true,
+            completedSteps: true,
+            skippedSteps: true,
+            completedAt: true,
+          },
+        },
+      },
     });
   }
 

@@ -355,6 +355,19 @@ async function main() {
     });
   }
 
+  await prisma.badgeDefinition.upsert({
+    where: { code: 'FIRST_SIP' },
+    create: {
+      code: 'FIRST_SIP',
+      name: 'First Sip',
+      description: 'Joined BeanCircle and took your first sip',
+      iconKey: 'coffee',
+      threshold: 1,
+      thresholdType: 'onboarding',
+    },
+    update: { name: 'First Sip' },
+  });
+
   console.log('Seed complete:', {
     admin: admin.id,
     demo: demo.id,
