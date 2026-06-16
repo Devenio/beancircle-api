@@ -35,13 +35,16 @@ import {
   ApplyTemplateDto,
   AssignTemplateDto,
   SetCafeFlagDto,
+  SetCafeOwnerDto,
   SetGlobalFlagDto,
   SetStepDto,
   UpdateCafeDto,
+  UpdateSuggestionDto,
   UpdateUserRoleDto,
   UpdateUserStatusDto,
   UpsertTemplateDto,
 } from './dto/super-admin.dto';
+import { CafeSuggestionStatus } from '@prisma/client';
 
 type Actor = { id: string };
 
@@ -161,6 +164,25 @@ export class SuperAdminController {
     return this.users.remove(actor.id, id);
   }
 
+  // ---------------- Cafe suggestions ----------------
+
+  @Get('cafe-suggestions')
+  listSuggestions(
+    @Query('status') status?: CafeSuggestionStatus,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.cafes.listSuggestions({ status, cursor });
+  }
+
+  @Patch('cafe-suggestions/:id')
+  updateSuggestion(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: UpdateSuggestionDto,
+  ) {
+    return this.cafes.updateSuggestion(actor.id, id, dto);
+  }
+
   // ---------------- Cafes ----------------
 
   @Get('cafes')
@@ -180,6 +202,29 @@ export class SuperAdminController {
   @Delete('cafes/:id')
   deleteCafe(@CurrentUser() actor: Actor, @Param('id') id: string) {
     return this.cafes.remove(actor.id, id);
+  }
+
+  @Get('cafes/:cafeId/staff')
+  getCafeStaff(@Param('cafeId') cafeId: string) {
+    return this.cafes.getCafeStaff(cafeId);
+  }
+
+  @Post('cafes/:cafeId/owner')
+  setCafeOwner(
+    @CurrentUser() actor: Actor,
+    @Param('cafeId') cafeId: string,
+    @Body() dto: SetCafeOwnerDto,
+  ) {
+    return this.cafes.setCafeOwner(actor.id, cafeId, dto.userId);
+  }
+
+  @Delete('cafes/:cafeId/staff/:userId')
+  removeCafeStaff(
+    @CurrentUser() actor: Actor,
+    @Param('cafeId') cafeId: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.cafes.removeCafeStaff(actor.id, cafeId, userId);
   }
 
   // ---------------- Menu templates ----------------

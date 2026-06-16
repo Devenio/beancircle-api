@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { CafeSuggestionStatus, CafeRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from './audit.service';
 import { UpdateCafeDto } from './dto/super-admin.dto';
@@ -60,6 +60,80 @@ export class CafesAdminService {
     await this.prisma.cafe.delete({ where: { id } });
     await this.audit.log(actorId, 'cafe.delete', 'cafe', id);
     return { deleted: true };
+  }
+
+  // ── Cafe suggestions ──────────────────────────────────────────────────────
+
+  listSuggestions(params: {
+    status?: CafeSuggestionStatus;
+    cursor?: string;
+    limit?: number;
+  }) {
+    const take = Math.min(params.limit ?? 50, 100);
+    return this.prisma.cafeSuggestion
+      .findMany({
+        where: params.status ? { status: params.status } : undefined,
+        include: {
+          user: {
+            select: { id: true, username: true, name: true, avatarUrl: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: take + 1,
+        ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+      })
+      .then((items) => {
+        const hasMore = items.length > take;
+        const data = hasMore ? items.slice(0, take) : items;
+        return { data, nextCursor: hasMore ? data[data.length - 1]?.id : null };
+      });
+  }
+
+  async updateSuggestion(
+    actorId: string,
+    id: string,
+    dto: { status: CafeSuggestionStatus; adminNote?: string },
+  ) {
+    const suggestion = await this.prisma.cafeSuggestion.findUnique({ where: { id } });
+    if (!suggestion) throw new NotFoundException('Suggestion not found');
+    const updated = await this.prisma.cafeSuggestion.update({
+      where: { id },
+      data: { status: dto.status },
+    });
+    await this.audit.log(actorId, 'suggestion.update', 'cafeSuggestion', id, dto);
+    return updated;
+  }
+
+  // ── Cafe staff / ownership ─────────────────────────────────────────────────
+
+  getCafeStaff(cafeId: string) {
+    return this.prisma.cafeStaff.findMany({
+      where: { cafeId },
+      include: {
+        user: { select: { id: true, username: true, name: true, avatarUrl: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async setCafeOwner(actorId: string, cafeId: string, userId: string) {
+    await this.assertExists(cafeId);
+    const staff = await this.prisma.cafeStaff.upsert({
+      where: { userId_cafeId: { userId, cafeId } },
+      create: { userId, cafeId, role: CafeRole.OWNER },
+      update: { role: CafeRole.OWNER },
+      include: {
+        user: { select: { id: true, username: true, name: true, avatarUrl: true } },
+      },
+    });
+    await this.audit.log(actorId, 'cafe.owner.set', 'cafe', cafeId, { userId });
+    return staff;
+  }
+
+  async removeCafeStaff(actorId: string, cafeId: string, userId: string) {
+    await this.prisma.cafeStaff.deleteMany({ where: { cafeId, userId } });
+    await this.audit.log(actorId, 'cafe.staff.remove', 'cafe', cafeId, { userId });
+    return { removed: true };
   }
 
   private async assertExists(id: string) {

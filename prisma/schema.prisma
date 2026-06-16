@@ -26,6 +26,12 @@ enum CafeRole {
   MODERATOR
 }
 
+enum CafeSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum CafeStaffInviteStatus {
   PENDING
   ACCEPTED
@@ -474,6 +480,7 @@ model User {
   onboarding             OnboardingProgress?
   beanAvatar             BeanAvatar?
   onboardingEvents       OnboardingEvent[]
+  cafeSuggestions        CafeSuggestion[]
 }
 
 /// A browser Web Push subscription (one row per device/endpoint).
@@ -2133,4 +2140,23 @@ model OnboardingStepConfig {
   createdAt   DateTime @default(now())
 
   @@index([order])
+}
+
+/// User-submitted cafe suggestion awaiting admin review.
+model CafeSuggestion {
+  id          String               @id @default(uuid())
+  suggestedBy String
+  name        String
+  address     String
+  lat         Float?
+  lng         Float?
+  notes       String?
+  status      CafeSuggestionStatus @default(PENDING)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  user        User                 @relation(fields: [suggestedBy], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([suggestedBy])
 }

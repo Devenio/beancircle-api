@@ -38,8 +38,8 @@ export class UsersService {
     private redis: RedisService,
   ) {}
 
-  getMe(userId: string) {
-    return this.prisma.user.findUniqueOrThrow({
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
         ...userSelect,
@@ -53,8 +53,15 @@ export class UsersService {
             completedAt: true,
           },
         },
+        cafeStaff: {
+          where: { role: 'OWNER' },
+          select: { cafeId: true },
+          take: 1,
+        },
       },
     });
+    const { cafeStaff, ...rest } = user;
+    return { ...rest, isCafeOwner: cafeStaff.length > 0 };
   }
 
   async updateMe(userId: string, dto: UpdateProfileDto) {

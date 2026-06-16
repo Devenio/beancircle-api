@@ -124,6 +124,15 @@ export class CafesService {
     });
   }
 
+  suggest(
+    userId: string,
+    data: { name: string; address: string; lat?: number; lng?: number; notes?: string },
+  ) {
+    return this.prisma.cafeSuggestion.create({
+      data: { suggestedBy: userId, ...data },
+    });
+  }
+
   update(
     id: string,
     data: Partial<{

@@ -5,11 +5,12 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MenuTheme, UserRole, UserStatus } from '@prisma/client';
+import { CafeSuggestionStatus, MenuTheme, UserRole, UserStatus } from '@prisma/client';
 
 export class SetGlobalFlagDto {
   @IsBoolean()
@@ -114,4 +115,18 @@ export class AssignTemplateDto {
   @IsArray()
   @IsString({ each: true })
   cafeIds: string[];
+}
+
+export class UpdateSuggestionDto {
+  @IsEnum(CafeSuggestionStatus)
+  status: CafeSuggestionStatus;
+
+  @IsOptional()
+  @IsString()
+  adminNote?: string;
+}
+
+export class SetCafeOwnerDto {
+  @IsUUID()
+  userId: string;
 }

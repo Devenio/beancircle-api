@@ -13,6 +13,7 @@ import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CheckinsService } from '../checkins/checkins.service';
 import { CreateCafeDto } from './dto/create-cafe.dto';
+import { SuggestCafeDto } from './dto/suggest-cafe.dto';
 import { UpdateCafeDto } from './dto/update-cafe.dto';
 import { CafesService } from './cafes.service';
 
@@ -46,6 +47,11 @@ export class CafesController {
   @Post(':id/checkins')
   checkin(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.checkinsService.create(user.id, id);
+  }
+
+  @Post('suggest')
+  suggest(@CurrentUser() user: { id: string }, @Body() dto: SuggestCafeDto) {
+    return this.cafesService.suggest(user.id, dto);
   }
 
   @Post()
