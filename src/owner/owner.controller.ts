@@ -1,17 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { OwnerService } from './owner.service';
 
-class ClaimCafeDto {
+class ClaimOwnershipDto {
+  @IsOptional()
   @IsString()
-  @MinLength(3)
+  @MaxLength(500)
+  message?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(32)
-  @Matches(/^[A-Z0-9-]+$/, {
-    message:
-      'claimCode must contain only uppercase letters, digits, and hyphens',
-  })
-  claimCode: string;
+  phone?: string;
 }
 
 class UpdateOwnerCafeDto {
@@ -59,16 +60,22 @@ export class OwnerController {
     return this.owner.listCafes(user.id);
   }
 
-  @Post('cafes/claim')
-  claim(@CurrentUser() user: { id: string }, @Body() dto: ClaimCafeDto) {
-    return this.owner.claimCafe(user.id, dto.claimCode);
+  @Get('cafes/unclaimed')
+  unclaimed(@Query('q') q?: string) {
+    return this.owner.listUnclaimed(q);
+  }
+
+  @Post('cafes/:id/claim')
+  claim(
+    @CurrentUser() user: { id: string },
+    @Param('id') cafeId: string,
+    @Body() dto: ClaimOwnershipDto,
+  ) {
+    return this.owner.claimOwnership(user.id, cafeId, dto);
   }
 
   @Get('cafes/:id/analytics')
-  analytics(
-    @CurrentUser() user: { id: string },
-    @Param('id') cafeId: string,
-  ) {
+  analytics(@CurrentUser() user: { id: string }, @Param('id') cafeId: string) {
     return this.owner.analytics(user.id, cafeId);
   }
 

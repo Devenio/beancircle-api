@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  CafeOwnershipClaimKind,
   CafePhotoKind,
   CafeRole,
   CafeStaffInviteStatus,
@@ -58,6 +59,14 @@ export class CafeOsService {
       });
       await tx.cafeStaff.create({
         data: { userId, cafeId: created.id, role: CafeRole.OWNER },
+      });
+      // Self-service cafes start unverified and go through admin review.
+      await tx.cafeOwnershipClaim.create({
+        data: {
+          cafeId: created.id,
+          userId,
+          kind: CafeOwnershipClaimKind.NEW_CAFE,
+        },
       });
       return created;
     });

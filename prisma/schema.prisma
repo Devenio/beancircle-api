@@ -32,6 +32,17 @@ enum CafeSuggestionStatus {
   REJECTED
 }
 
+enum CafeOwnershipClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CafeOwnershipClaimKind {
+  CLAIM_EXISTING
+  NEW_CAFE
+}
+
 enum CafeStaffInviteStatus {
   PENDING
   ACCEPTED
@@ -115,6 +126,8 @@ enum NotificationType {
   BEAN_REBEAN
   BEAN_QUOTE
   CHALLENGE_COMPLETE
+  CAFE_OWNERSHIP_APPROVED
+  CAFE_OWNERSHIP_REJECTED
 }
 
 enum GiftStatus {
@@ -481,6 +494,7 @@ model User {
   beanAvatar             BeanAvatar?
   onboardingEvents       OnboardingEvent[]
   cafeSuggestions        CafeSuggestion[]
+  ownershipClaims        CafeOwnershipClaim[]
 }
 
 /// A browser Web Push subscription (one row per device/endpoint).
@@ -709,6 +723,7 @@ model Cafe {
   followerCount   Int      @default(0)
   reviewCount     Int      @default(0)
   isPartner       Boolean  @default(false)
+  isVerified      Boolean  @default(false)
   checkinCode     String?  @unique
   claimCode       String?  @unique
   bestCoffee      Boolean  @default(false)
@@ -758,6 +773,7 @@ model Cafe {
   beans               Bean[]
   featureFlags        CafeFeatureFlag[]
   templateAssignments MenuTemplateAssignment[]
+  ownershipClaims     CafeOwnershipClaim[]
 
   @@index([cityId])
   @@index([cityId, avgRating])
@@ -2160,4 +2176,26 @@ model CafeSuggestion {
 
   @@index([status])
   @@index([suggestedBy])
+}
+
+/// Admin-reviewed request to own/verify a cafe — either claiming an existing
+/// unowned cafe ("I'm the owner") or verifying a self-created cafe.
+model CafeOwnershipClaim {
+  id        String                   @id @default(uuid())
+  cafeId    String
+  userId    String
+  kind      CafeOwnershipClaimKind   @default(CLAIM_EXISTING)
+  status    CafeOwnershipClaimStatus @default(PENDING)
+  message   String?
+  phone     String?
+  adminNote String?
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  cafe      Cafe                     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([cafeId])
+  @@index([userId])
 }

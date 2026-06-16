@@ -26,7 +26,7 @@ export class DiscoverService {
     filters: DiscoverFilterKey[] = [],
     q?: string,
   ): Prisma.CafeWhereInput {
-    const where: Prisma.CafeWhereInput = {};
+    const where: Prisma.CafeWhereInput = { isVerified: true };
     if (cityId) where.cityId = cityId;
     if (q?.trim()) {
       where.name = { contains: q.trim(), mode: 'insensitive' };
@@ -69,7 +69,10 @@ export class DiscoverService {
       cityId = user?.cityId ?? undefined;
     }
 
-    const baseWhere: Prisma.CafeWhereInput = cityId ? { cityId } : {};
+    const baseWhere: Prisma.CafeWhereInput = {
+      isVerified: true,
+      ...(cityId ? { cityId } : {}),
+    };
 
     const [trending, newest, hiddenGems, recommended] = await Promise.all([
       this.prisma.cafe.findMany({

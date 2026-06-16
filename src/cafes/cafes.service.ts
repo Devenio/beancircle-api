@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { CafeRole } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { encodeGeohash } from '../common/geo/geo.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,6 +11,7 @@ export class CafesService {
   list(cityId?: string, q?: string) {
     return this.prisma.cafe.findMany({
       where: {
+        isVerified: true,
         ...(cityId ? { cityId } : {}),
         ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
       },
@@ -51,13 +53,23 @@ export class CafesService {
     });
     if (!cafe) throw new NotFoundException('Cafe not found');
     let isFollowing = false;
+    let myClaimStatus: string | null = null;
     if (userId) {
       const f = await this.prisma.cafeFollow.findUnique({
         where: { userId_cafeId: { userId, cafeId: id } },
       });
       isFollowing = !!f;
+      const claim = await this.prisma.cafeOwnershipClaim.findFirst({
+        where: { cafeId: id, userId },
+        orderBy: { createdAt: 'desc' },
+        select: { status: true },
+      });
+      myClaimStatus = claim?.status ?? null;
     }
-    return { ...cafe, isFollowing };
+    const ownerCount = await this.prisma.cafeStaff.count({
+      where: { cafeId: id, role: CafeRole.OWNER },
+    });
+    return { ...cafe, isFollowing, hasOwner: ownerCount > 0, myClaimStatus };
   }
 
   async follow(userId: string, cafeId: string) {
@@ -119,6 +131,7 @@ export class CafesService {
         ...data,
         checkinCode,
         claimCode,
+        isVerified: true,
         geohash: encodeGeohash(data.lat, data.lng, 7),
       },
     });

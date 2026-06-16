@@ -10,7 +10,13 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CafeSuggestionStatus, MenuTheme, UserRole, UserStatus } from '@prisma/client';
+import {
+  CafeOwnershipClaimStatus,
+  CafeSuggestionStatus,
+  MenuTheme,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 
 export class SetGlobalFlagDto {
   @IsBoolean()
@@ -128,6 +134,15 @@ export class UpdateSuggestionDto {
   @IsOptional()
   @IsUUID()
   cityId?: string;
+}
+
+export class UpdateClaimDto {
+  @IsEnum(CafeOwnershipClaimStatus)
+  status: CafeOwnershipClaimStatus;
+
+  @IsOptional()
+  @IsString()
+  adminNote?: string;
 }
 
 export class SetCafeOwnerDto {

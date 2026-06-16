@@ -39,12 +39,16 @@ import {
   SetGlobalFlagDto,
   SetStepDto,
   UpdateCafeDto,
+  UpdateClaimDto,
   UpdateSuggestionDto,
   UpdateUserRoleDto,
   UpdateUserStatusDto,
   UpsertTemplateDto,
 } from './dto/super-admin.dto';
-import { CafeSuggestionStatus } from '@prisma/client';
+import {
+  CafeOwnershipClaimStatus,
+  CafeSuggestionStatus,
+} from '@prisma/client';
 
 type Actor = { id: string };
 
@@ -181,6 +185,25 @@ export class SuperAdminController {
     @Body() dto: UpdateSuggestionDto,
   ) {
     return this.cafes.updateSuggestion(actor.id, id, dto);
+  }
+
+  // ---------------- Cafe ownership claims ----------------
+
+  @Get('cafe-claims')
+  listClaims(
+    @Query('status') status?: CafeOwnershipClaimStatus,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.cafes.listClaims({ status, cursor });
+  }
+
+  @Patch('cafe-claims/:id')
+  updateClaim(
+    @CurrentUser() actor: Actor,
+    @Param('id') id: string,
+    @Body() dto: UpdateClaimDto,
+  ) {
+    return this.cafes.updateClaim(actor.id, id, dto);
   }
 
   // ---------------- Cafes ----------------

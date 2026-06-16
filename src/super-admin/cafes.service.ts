@@ -1,5 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CafeSuggestionStatus, CafeRole, Prisma } from '@prisma/client';
+import {
+  CafeOwnershipClaimStatus,
+  CafeSuggestionStatus,
+  CafeRole,
+  NotificationType,
+  Prisma,
+} from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from './audit.service';
 import { UpdateCafeDto } from './dto/super-admin.dto';
@@ -9,6 +16,7 @@ export class CafesAdminService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
+    private notifications: NotificationsService,
   ) {}
 
   async list(params: { q?: string; cursor?: string; limit?: number }) {
@@ -119,6 +127,7 @@ export class CafesAdminService {
             cityId: city.id,
             countryId: city.countryId,
             createdById: actorId,
+            isVerified: true,
           },
         }),
       ]);
@@ -132,6 +141,100 @@ export class CafesAdminService {
       data: { status: dto.status, adminNote: dto.adminNote },
     });
     await this.audit.log(actorId, 'suggestion.update', 'cafeSuggestion', id, dto);
+    return updated;
+  }
+
+  // ── Cafe ownership claims ──────────────────────────────────────────────────
+
+  listClaims(params: {
+    status?: CafeOwnershipClaimStatus;
+    cursor?: string;
+    limit?: number;
+  }) {
+    const take = Math.min(params.limit ?? 50, 100);
+    return this.prisma.cafeOwnershipClaim
+      .findMany({
+        where: params.status ? { status: params.status } : undefined,
+        include: {
+          user: {
+            select: { id: true, username: true, name: true, avatarUrl: true },
+          },
+          cafe: { select: { id: true, name: true, address: true, isVerified: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: take + 1,
+        ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+      })
+      .then((items) => {
+        const hasMore = items.length > take;
+        const data = hasMore ? items.slice(0, take) : items;
+        return { data, nextCursor: hasMore ? data[data.length - 1]?.id : null };
+      });
+  }
+
+  async updateClaim(
+    actorId: string,
+    id: string,
+    dto: { status: CafeOwnershipClaimStatus; adminNote?: string },
+  ) {
+    const claim = await this.prisma.cafeOwnershipClaim.findUnique({
+      where: { id },
+    });
+    if (!claim) throw new NotFoundException('Claim not found');
+
+    if (dto.status === CafeOwnershipClaimStatus.APPROVED) {
+      await this.prisma.$transaction([
+        this.prisma.cafeOwnershipClaim.update({
+          where: { id },
+          data: { status: dto.status, adminNote: dto.adminNote },
+        }),
+        this.prisma.cafe.update({
+          where: { id: claim.cafeId },
+          data: { isVerified: true },
+        }),
+        this.prisma.cafeStaff.upsert({
+          where: { userId_cafeId: { userId: claim.userId, cafeId: claim.cafeId } },
+          create: { userId: claim.userId, cafeId: claim.cafeId, role: CafeRole.OWNER },
+          update: { role: CafeRole.OWNER },
+        }),
+      ]);
+      await this.audit.log(actorId, 'claim.approve', 'cafeOwnershipClaim', id, dto);
+      await this.notifications.create({
+        userId: claim.userId,
+        type: NotificationType.CAFE_OWNERSHIP_APPROVED,
+        entityType: 'cafe',
+        entityId: claim.cafeId,
+      });
+      return this.prisma.cafeOwnershipClaim.findUnique({ where: { id } });
+    }
+
+    if (dto.status === CafeOwnershipClaimStatus.REJECTED) {
+      await this.prisma.$transaction([
+        this.prisma.cafeOwnershipClaim.update({
+          where: { id },
+          data: { status: dto.status, adminNote: dto.adminNote },
+        }),
+        // Drop the user's ownership so the cafe leaves their list. The cafe row
+        // stays (unverified → hidden from public/map, still visible to admins).
+        this.prisma.cafeStaff.deleteMany({
+          where: { cafeId: claim.cafeId, userId: claim.userId },
+        }),
+      ]);
+      await this.audit.log(actorId, 'claim.reject', 'cafeOwnershipClaim', id, dto);
+      await this.notifications.create({
+        userId: claim.userId,
+        type: NotificationType.CAFE_OWNERSHIP_REJECTED,
+        entityType: 'cafe',
+        entityId: claim.cafeId,
+      });
+      return this.prisma.cafeOwnershipClaim.findUnique({ where: { id } });
+    }
+
+    const updated = await this.prisma.cafeOwnershipClaim.update({
+      where: { id },
+      data: { status: dto.status, adminNote: dto.adminNote },
+    });
+    await this.audit.log(actorId, 'claim.update', 'cafeOwnershipClaim', id, dto);
     return updated;
   }
 

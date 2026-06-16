@@ -140,6 +140,20 @@ export class NotificationsService {
           tag: n.type,
         };
       }
+      case NotificationType.CAFE_OWNERSHIP_APPROVED:
+        return {
+          title: "You're verified! 🎉",
+          body: 'Your cafe ownership was approved. Cafe OS is now unlocked.',
+          url: '/owner',
+          tag: n.type,
+        };
+      case NotificationType.CAFE_OWNERSHIP_REJECTED:
+        return {
+          title: 'Ownership request update',
+          body: 'We reviewed your cafe ownership request. Tap to learn more.',
+          url: '/owner',
+          tag: n.type,
+        };
       default:
         return {
           title: 'BeanCircle',

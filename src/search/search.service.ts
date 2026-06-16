@@ -39,6 +39,7 @@ export class SearchService {
         ? []
         : await this.prisma.cafe.findMany({
             where: {
+              isVerified: true,
               name: { contains: query, mode: 'insensitive' },
               ...(cityId ? { cityId } : {}),
             },

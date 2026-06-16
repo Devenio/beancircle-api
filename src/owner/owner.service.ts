@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CafeRole } from '@prisma/client';
+import { CafeOwnershipClaimKind, CafeRole } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -46,23 +46,53 @@ export class OwnerService {
     });
   }
 
-  async claimCafe(userId: string, claimCode: string) {
-    const cafe = await this.prisma.cafe.findUnique({
-      where: { claimCode: claimCode.trim().toUpperCase() },
+  /** Verified cafes that have no OWNER staff yet — claimable from search. */
+  listUnclaimed(q?: string) {
+    return this.prisma.cafe.findMany({
+      where: {
+        isVerified: true,
+        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+        staff: { none: { role: CafeRole.OWNER } },
+      },
+      include: {
+        photos: { take: 1, orderBy: { order: 'asc' } },
+        city: true,
+      },
+      orderBy: { followerCount: 'desc' },
+      take: 20,
     });
-    if (!cafe) {
-      throw new NotFoundException('Invalid claim code');
+  }
+
+  /** "I'm the owner" — create a pending review for an existing unowned cafe. */
+  async claimOwnership(
+    userId: string,
+    cafeId: string,
+    data: { message?: string; phone?: string },
+  ) {
+    const cafe = await this.prisma.cafe.findUnique({ where: { id: cafeId } });
+    if (!cafe) throw new NotFoundException('Cafe not found');
+
+    const owner = await this.prisma.cafeStaff.findFirst({
+      where: { cafeId, role: CafeRole.OWNER },
+    });
+    if (owner) {
+      throw new BadRequestException('This cafe already has an owner');
     }
-    const existing = await this.prisma.cafeStaff.findUnique({
-      where: { userId_cafeId: { userId, cafeId: cafe.id } },
+
+    const pending = await this.prisma.cafeOwnershipClaim.findFirst({
+      where: { cafeId, userId, status: 'PENDING' },
     });
-    if (existing) {
-      return { cafe, alreadyOwned: true };
-    }
-    await this.prisma.cafeStaff.create({
-      data: { userId, cafeId: cafe.id, role: CafeRole.OWNER },
+    if (pending) return pending;
+
+    return this.prisma.cafeOwnershipClaim.create({
+      data: {
+        cafeId,
+        userId,
+        kind: CafeOwnershipClaimKind.CLAIM_EXISTING,
+        message: data.message,
+        phone: data.phone,
+      },
     });
-    return { cafe, alreadyOwned: false };
   }
 
   async analytics(userId: string, cafeId: string) {

@@ -12,6 +12,7 @@ import { CAFE_ROLES_KEY } from '../decorators/cafe-roles.decorator';
 export interface CafeStaffRequest {
   user?: { id: string };
   params: Record<string, string>;
+  method: string;
   cafeStaff?: CafeStaff;
 }
 
@@ -48,6 +49,20 @@ export class CafeStaffGuard implements CanActivate {
     );
     if (roles?.length && !roles.includes(staff.role)) {
       throw new ForbiddenException('Insufficient cafe role');
+    }
+
+    // Cafe OS is preview-only until the cafe is verified: reads (GET) are
+    // allowed, but any mutation is blocked until an admin verifies ownership.
+    if (req.method !== 'GET') {
+      const cafe = await this.prisma.cafe.findUnique({
+        where: { id: cafeId },
+        select: { isVerified: true },
+      });
+      if (!cafe?.isVerified) {
+        throw new ForbiddenException(
+          'This cafe is not verified yet. You can preview Cafe OS, but actions are disabled until verification.',
+        );
+      }
     }
 
     req.cafeStaff = staff;
