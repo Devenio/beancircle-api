@@ -2151,6 +2151,7 @@ model CafeSuggestion {
   lat         Float?
   lng         Float?
   notes       String?
+  adminNote   String?
   status      CafeSuggestionStatus @default(PENDING)
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt

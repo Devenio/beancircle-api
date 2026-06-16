@@ -124,6 +124,10 @@ export class UpdateSuggestionDto {
   @IsOptional()
   @IsString()
   adminNote?: string;
+
+  @IsOptional()
+  @IsUUID()
+  cityId?: string;
 }
 
 export class SetCafeOwnerDto {

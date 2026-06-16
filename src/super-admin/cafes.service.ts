@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CafeSuggestionStatus, CafeRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from './audit.service';
@@ -92,16 +92,63 @@ export class CafesAdminService {
   async updateSuggestion(
     actorId: string,
     id: string,
-    dto: { status: CafeSuggestionStatus; adminNote?: string },
+    dto: { status: CafeSuggestionStatus; adminNote?: string; cityId?: string },
   ) {
     const suggestion = await this.prisma.cafeSuggestion.findUnique({ where: { id } });
     if (!suggestion) throw new NotFoundException('Suggestion not found');
+
+    if (dto.status === CafeSuggestionStatus.APPROVED) {
+      if (!dto.cityId) throw new BadRequestException('cityId is required when approving a suggestion');
+      const city = await this.prisma.city.findUnique({ where: { id: dto.cityId } });
+      if (!city) throw new NotFoundException('City not found');
+
+      const slug = await this.uniqueSlug(suggestion.name);
+
+      const [updated] = await this.prisma.$transaction([
+        this.prisma.cafeSuggestion.update({
+          where: { id },
+          data: { status: dto.status, adminNote: dto.adminNote },
+        }),
+        this.prisma.cafe.create({
+          data: {
+            name: suggestion.name,
+            slug,
+            address: suggestion.address,
+            lat: suggestion.lat ?? 0,
+            lng: suggestion.lng ?? 0,
+            cityId: city.id,
+            countryId: city.countryId,
+            createdById: actorId,
+          },
+        }),
+      ]);
+
+      await this.audit.log(actorId, 'suggestion.approve', 'cafeSuggestion', id, dto);
+      return updated;
+    }
+
     const updated = await this.prisma.cafeSuggestion.update({
       where: { id },
-      data: { status: dto.status },
+      data: { status: dto.status, adminNote: dto.adminNote },
     });
     await this.audit.log(actorId, 'suggestion.update', 'cafeSuggestion', id, dto);
     return updated;
+  }
+
+  private async uniqueSlug(name: string) {
+    const base =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 48) || 'cafe';
+    let slug = base;
+    for (let i = 0; i < 50; i += 1) {
+      const taken = await this.prisma.cafe.findUnique({ where: { slug } });
+      if (!taken) return slug;
+      slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+    return `${base}-${Date.now().toString(36)}`;
   }
 
   // ── Cafe staff / ownership ─────────────────────────────────────────────────
