@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -50,6 +51,14 @@ export class UsersController {
     @Body('endpoint') endpoint: string,
   ) {
     return this.push.removeSubscription(user.id, endpoint);
+  }
+
+  @Get('check-username')
+  checkUsername(
+    @CurrentUser() user: { id: string },
+    @Query('username') username: string,
+  ) {
+    return this.usersService.checkUsernameAvailable(username ?? '', user.id);
   }
 
   @Get('me')

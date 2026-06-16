@@ -80,6 +80,14 @@ export class UsersService {
     });
   }
 
+  async checkUsernameAvailable(username: string, requesterId: string) {
+    const taken = await this.prisma.user.findFirst({
+      where: { username, NOT: { id: requesterId } },
+      select: { id: true },
+    });
+    return { available: !taken };
+  }
+
   async getByUsername(username: string, viewerId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { username },
