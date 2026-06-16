@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Patch, Post, Put } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { SetInterestsDto } from './dto/set-interests.dto';
 import { TrackEventDto } from './dto/track-event.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
@@ -9,6 +10,13 @@ import { OnboardingService } from './onboarding.service';
 @Controller('onboarding')
 export class OnboardingController {
   constructor(private onboarding: OnboardingService) {}
+
+  /** Active, ordered onboarding step keys. Public — only describes the flow. */
+  @Public()
+  @Get('flow')
+  getFlow() {
+    return this.onboarding.getActiveFlow();
+  }
 
   @Get('me')
   getMe(@CurrentUser() user: { id: string }) {
@@ -50,10 +58,7 @@ export class OnboardingController {
   }
 
   @Post('events')
-  trackEvent(
-    @CurrentUser() user: { id: string },
-    @Body() dto: TrackEventDto,
-  ) {
+  trackEvent(@CurrentUser() user: { id: string }, @Body() dto: TrackEventDto) {
     return this.onboarding.trackEvent(user.id, dto);
   }
 }

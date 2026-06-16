@@ -2119,3 +2119,18 @@ model OnboardingEvent {
   @@index([step, type])
   @@index([createdAt])
 }
+
+/// Admin-configurable definition of a single onboarding activation step.
+/// Synced from ONBOARDING_FLOW_STEPS on boot; `enabled`/`order` are editable
+/// from the super-admin panel and drive the live onboarding sequence.
+model OnboardingStepConfig {
+  key         String   @id
+  label       String
+  description String?
+  enabled     Boolean  @default(true)
+  order       Int
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([order])
+}

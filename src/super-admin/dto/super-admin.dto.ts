@@ -23,6 +23,11 @@ export class SetCafeFlagDto {
   enabled: boolean | null;
 }
 
+export class SetStepDto {
+  @IsBoolean()
+  enabled: boolean;
+}
+
 export class UpdateUserRoleDto {
   @IsEnum(UserRole)
   role: UserRole;

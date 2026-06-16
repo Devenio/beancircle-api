@@ -16,6 +16,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { MenusService } from '../menus/menus.service';
+import { OnboardingFlowService } from '../onboarding/onboarding-flow.service';
 import {
   CreateCategoryDto,
   MenuItemFieldsDto,
@@ -35,6 +36,7 @@ import {
   AssignTemplateDto,
   SetCafeFlagDto,
   SetGlobalFlagDto,
+  SetStepDto,
   UpdateCafeDto,
   UpdateUserRoleDto,
   UpdateUserStatusDto,
@@ -56,6 +58,7 @@ export class SuperAdminController {
     private analytics: AnalyticsService,
     private audit: AuditService,
     private menus: MenusService,
+    private flow: OnboardingFlowService,
   ) {}
 
   // ---------------- Feature flags ----------------
@@ -89,6 +92,33 @@ export class SuperAdminController {
       enabled: dto.enabled,
     });
     return this.flags.setCafeOverride(cafeId, key, dto.enabled ?? null);
+  }
+
+  // ---------------- Onboarding flow ----------------
+
+  @Get('onboarding-flow')
+  listFlowSteps() {
+    return this.flow.listForAdmin();
+  }
+
+  @Patch('onboarding-flow/reorder')
+  reorderFlowSteps(@CurrentUser() actor: Actor, @Body() dto: ReorderIdsDto) {
+    void this.audit.log(actor.id, 'flow.reorder', 'onboardingStep', undefined, {
+      ids: dto.ids,
+    });
+    return this.flow.reorder(dto.ids);
+  }
+
+  @Patch('onboarding-flow/:key')
+  setFlowStep(
+    @CurrentUser() actor: Actor,
+    @Param('key') key: string,
+    @Body() dto: SetStepDto,
+  ) {
+    void this.audit.log(actor.id, 'flow.step.set', 'onboardingStep', key, {
+      enabled: dto.enabled,
+    });
+    return this.flow.setStep(key, dto.enabled);
   }
 
   // ---------------- Users ----------------
@@ -178,10 +208,7 @@ export class SuperAdminController {
   }
 
   @Post('menu-templates/files/:key/import')
-  importFileTemplate(
-    @CurrentUser() actor: Actor,
-    @Param('key') key: string,
-  ) {
+  importFileTemplate(@CurrentUser() actor: Actor, @Param('key') key: string) {
     return this.fileTemplates.import(actor.id, key);
   }
 
@@ -200,10 +227,7 @@ export class SuperAdminController {
   }
 
   @Post('menu-templates')
-  createTemplate(
-    @CurrentUser() actor: Actor,
-    @Body() dto: UpsertTemplateDto,
-  ) {
+  createTemplate(@CurrentUser() actor: Actor, @Body() dto: UpsertTemplateDto) {
     return this.templates.upsert(actor.id, dto);
   }
 

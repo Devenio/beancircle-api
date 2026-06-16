@@ -5,23 +5,19 @@ import { SetInterestsDto } from './dto/set-interests.dto';
 import { TrackEventDto } from './dto/track-event.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
+import { ONBOARDING_FLOW_KEYS } from './onboarding-flow.constants';
+import { OnboardingFlowService } from './onboarding-flow.service';
 
-/** Activation steps that come after the mandatory username gate, in order. */
-export const ONBOARDING_STEPS = [
-  'welcome',
-  'interests',
-  'avatar',
-  'circle',
-  'firstPost',
-  'cafe',
-  'achievement',
-  'profile',
-  'invite',
-] as const;
+/** Default activation steps after the mandatory username gate, in order. The
+ *  live order/enablement is admin-managed via OnboardingFlowService. */
+export const ONBOARDING_STEPS = ONBOARDING_FLOW_KEYS;
 
 @Injectable()
 export class OnboardingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private flow: OnboardingFlowService,
+  ) {}
 
   /** Lazily create the FIRST_SIP badge definition (mirrors connection-badges). */
   private async ensureFirstSipBadge() {
@@ -80,7 +76,7 @@ export class OnboardingService {
   }
 
   async getOnboarding(userId: string) {
-    const [progress, avatar, interests, user] = await Promise.all([
+    const [progress, avatar, interests, user, flow] = await Promise.all([
       this.ensureProgress(userId),
       this.prisma.beanAvatar.findUnique({ where: { userId } }),
       this.prisma.userInterest.findMany({ where: { userId } }),
@@ -96,17 +92,19 @@ export class OnboardingService {
           cityId: true,
         },
       }),
+      this.flow.getActiveFlow(),
     ]);
     return {
       progress,
       avatar,
       interests: interests.map((i) => i.interest),
-      completion: this.computeCompletion(
-        user,
-        interests.length,
-        !!avatar,
-      ),
+      flow,
+      completion: this.computeCompletion(user, interests.length, !!avatar),
     };
+  }
+
+  getActiveFlow() {
+    return this.flow.getActiveFlow();
   }
 
   async updateProgress(userId: string, dto: UpdateOnboardingDto) {
