@@ -206,6 +206,11 @@ export class RealtimeGateway
     if (!userId || !data.conversationId) return;
     const member = await this.chatService.isMember(data.conversationId, userId);
     if (!member) return;
+    // Respect the sender's "typing indicators" privacy setting. "Stopped
+    // typing" (typing: false) is always allowed so a stale bubble can clear.
+    if (data.typing && !(await this.settingEnabled(userId, 'typingIndicators'))) {
+      return;
+    }
     const payload = {
       userId,
       username: socketData.username,
@@ -250,17 +255,36 @@ export class RealtimeGateway
       userId,
       data.lastMessageId,
     );
-    // Tell the peer their messages were read (for seen receipts)...
-    this.emitToConversation(data.conversationId, 'message:read', {
-      userId,
-      conversationId: data.conversationId,
-      lastReadMessageId: result.lastReadMessageId,
-      lastReadAt: result.lastReadAt,
-    });
+    // Tell the peer their messages were read (for seen receipts) — but only if
+    // the reader has read receipts enabled. Marking read for unread counts is
+    // independent of broadcasting the receipt.
+    if (await this.settingEnabled(userId, 'readReceipts')) {
+      this.emitToConversation(data.conversationId, 'message:read', {
+        userId,
+        conversationId: data.conversationId,
+        lastReadMessageId: result.lastReadMessageId,
+        lastReadAt: result.lastReadAt,
+      });
+    }
     // ...and tell the reader's own devices to clear unread for this thread.
     this.emitToUser(userId, 'conversation:read', {
       conversationId: data.conversationId,
       lastReadMessageId: result.lastReadMessageId,
     });
+  }
+
+  /**
+   * Reads a single boolean preference from `UserSettings`, defaulting to
+   * enabled when no settings row exists yet.
+   */
+  private async settingEnabled(
+    userId: string,
+    field: 'typingIndicators' | 'readReceipts',
+  ): Promise<boolean> {
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      select: { [field]: true },
+    });
+    return settings ? (settings[field] as boolean) : true;
   }
 }

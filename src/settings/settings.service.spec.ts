@@ -2,7 +2,9 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AutoDownloadMode,
+  DiscoveryVisibility,
   FontSizeLevel,
+  LocationVisibility,
   MediaQualityLevel,
   MessageDensityLevel,
   VisibilityLevel,
@@ -38,6 +40,9 @@ function baseSettings(overrides: Record<string, unknown> = {}) {
     linkPreviews: true,
     typingIndicators: true,
     autoCleanupDays: 30,
+    locationVisibility: LocationVisibility.APPROXIMATE,
+    discoveryVisibility: DiscoveryVisibility.EVERYONE,
+    showOnlineStatus: true,
     updatedAt: new Date('2026-06-05T12:00:00.000Z'),
     ...overrides,
   };

@@ -5,10 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, VisibilityLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RedisService } from '../redis/redis.service';
+import { friendshipPair } from '../common/geo/geo.util';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 const userSelect = {
@@ -103,11 +104,14 @@ export class UsersService {
         favoriteCafes: {
           include: { cafe: { include: { photos: { take: 1 } } } },
         },
+        settings: { select: { profileVisibility: true } },
       },
     });
     if (!user) throw new NotFoundException('User not found');
+
+    const isSelf = viewerId === user.id;
     let isFollowing = false;
-    if (viewerId && viewerId !== user.id) {
+    if (viewerId && !isSelf) {
       const follow = await this.prisma.userFollow.findUnique({
         where: {
           followerId_followingId: { followerId: viewerId, followingId: user.id },
@@ -115,7 +119,39 @@ export class UsersService {
       });
       isFollowing = !!follow;
     }
-    return { ...user, isFollowing, isSelf: viewerId === user.id };
+
+    const { settings, favoriteCafes, ...profile } = user;
+    const visibility = settings?.profileVisibility ?? VisibilityLevel.EVERYONE;
+    const visible = await this.viewerPassesVisibility(
+      visibility,
+      user.id,
+      viewerId,
+    );
+
+    // Restricted profiles expose only the public identity card so the viewer
+    // can still find/follow the user without seeing private detail.
+    if (!visible) {
+      return {
+        id: profile.id,
+        username: profile.username,
+        name: profile.name,
+        avatarUrl: profile.avatarUrl,
+        city: profile.city,
+        followersCount: profile.followersCount,
+        followingCount: profile.followingCount,
+        isFollowing,
+        isSelf,
+        restricted: true,
+      };
+    }
+
+    return {
+      ...profile,
+      favoriteCafes,
+      isFollowing,
+      isSelf,
+      restricted: false,
+    };
   }
 
   async follow(followerId: string, followingId: string) {
@@ -160,17 +196,71 @@ export class UsersService {
     });
   }
 
+  /** True when `viewerId` and `ownerId` are confirmed friends ("contacts"). */
+  private async isContact(viewerId: string, ownerId: string): Promise<boolean> {
+    const [a, b] = friendshipPair(viewerId, ownerId);
+    const friendship = await this.prisma.friendship.findUnique({
+      where: { userAId_userBId: { userAId: a, userBId: b } },
+      select: { id: true },
+    });
+    return !!friendship;
+  }
+
+  /**
+   * Resolves a `VisibilityLevel` for a given viewer: EVERYONE always passes,
+   * NOBODY never does, CONTACTS only for confirmed friends. The owner viewing
+   * themselves always passes.
+   */
+  private async viewerPassesVisibility(
+    level: VisibilityLevel,
+    ownerId: string,
+    viewerId?: string,
+  ): Promise<boolean> {
+    if (viewerId === ownerId) return true;
+    if (level === VisibilityLevel.EVERYONE) return true;
+    if (level === VisibilityLevel.NOBODY) return false;
+    if (!viewerId) return false;
+    return this.isContact(viewerId, ownerId);
+  }
+
   async getPresence(targetUserId: string, viewerId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { id: true, lastSeenAt: true, showLastSeen: true },
+      select: {
+        id: true,
+        lastSeenAt: true,
+        showLastSeen: true,
+        settings: {
+          select: {
+            lastSeenVisibility: true,
+            onlineStatusVisibility: true,
+            showOnlineStatus: true,
+          },
+        },
+      },
     });
     if (!user) throw new NotFoundException('User not found');
 
-    const online = await this.redis.isOnline(targetUserId);
     const isSelf = viewerId === targetUserId;
+    const connected = await this.redis.isOnline(targetUserId);
 
-    if (!user.showLastSeen && !isSelf) {
+    // Online status: master toggle off hides it for everyone but the user;
+    // otherwise honor the per-audience visibility level.
+    const onlineLevel =
+      user.settings?.onlineStatusVisibility ?? VisibilityLevel.EVERYONE;
+    const onlineAllowed =
+      (user.settings?.showOnlineStatus ?? true) &&
+      (await this.viewerPassesVisibility(onlineLevel, targetUserId, viewerId));
+    const online = isSelf ? connected : onlineAllowed && connected;
+
+    // Last seen: legacy boolean plus the per-audience visibility level.
+    const lastSeenLevel =
+      user.settings?.lastSeenVisibility ?? VisibilityLevel.EVERYONE;
+    const lastSeenAllowed =
+      user.showLastSeen &&
+      (await this.viewerPassesVisibility(lastSeenLevel, targetUserId, viewerId));
+
+    if (!isSelf && !lastSeenAllowed) {
       return { userId: targetUserId, online, lastSeenAt: null, hidden: true };
     }
 

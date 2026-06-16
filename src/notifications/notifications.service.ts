@@ -20,6 +20,19 @@ const PUSH_DENYLIST = new Set<NotificationType>([
   NotificationType.BEAN_REBEAN,
 ]);
 
+/**
+ * Maps a notification type to the per-category preference that gates it.
+ * Types not listed are gated only by the master `pushNotifications` switch.
+ */
+const PUSH_CATEGORY: Partial<
+  Record<NotificationType, 'message' | 'mention' | 'group'>
+> = {
+  [NotificationType.NEW_MESSAGE]: 'message',
+  [NotificationType.BEAN_MENTION]: 'mention',
+  [NotificationType.SQUAD_MESSAGE]: 'group',
+  [NotificationType.SQUAD_INVITATION]: 'group',
+};
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -54,15 +67,50 @@ export class NotificationsService {
     });
     this.realtime.emitToUser(data.userId, 'notification:new', notification);
 
-    // Best-effort web push — never let delivery failures break notification writes.
+    // Best-effort web push — never let delivery failures break notification
+    // writes, and respect the recipient's notification preferences.
     const pushPayload = this.buildPushPayload(notification);
     if (pushPayload) {
-      void this.push
-        .sendToUser(data.userId, pushPayload)
+      void this.isPushAllowed(data.userId, data.type)
+        .then((allowed) =>
+          allowed ? this.push.sendToUser(data.userId, pushPayload) : undefined,
+        )
         .catch(() => undefined);
     }
 
     return notification;
+  }
+
+  /**
+   * Honors the recipient's Settings → Notifications toggles: the master push
+   * switch plus per-category (message / mention / group) preferences. Missing
+   * settings rows fall back to "allowed" so new users still get notified.
+   */
+  private async isPushAllowed(
+    userId: string,
+    type: NotificationType,
+  ): Promise<boolean> {
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      select: {
+        pushNotifications: true,
+        messageNotifications: true,
+        mentionNotifications: true,
+        groupNotifications: true,
+      },
+    });
+    if (!settings) return true;
+    if (!settings.pushNotifications) return false;
+    switch (PUSH_CATEGORY[type]) {
+      case 'message':
+        return settings.messageNotifications;
+      case 'mention':
+        return settings.mentionNotifications;
+      case 'group':
+        return settings.groupNotifications;
+      default:
+        return true;
+    }
   }
 
   /** Map a notification to a push payload, or null to skip delivery. */
