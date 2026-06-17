@@ -545,6 +545,7 @@ model UserSettings {
   onlineStatusVisibility VisibilityLevel     @default(EVERYONE)
   readReceipts           Boolean             @default(true)
   profileVisibility      VisibilityLevel     @default(EVERYONE)
+  socialLinksDefaultVisibility VisibilityLevel @default(EVERYONE)
   pushNotifications      Boolean             @default(true)
   messageNotifications   Boolean             @default(true)
   mentionNotifications   Boolean             @default(true)

@@ -60,6 +60,11 @@ export class SettingsService {
     if (dto.profileVisibility !== undefined) {
       data.profileVisibility = toVisibilityLevel(dto.profileVisibility);
     }
+    if (dto.socialLinksDefaultVisibility !== undefined) {
+      data.socialLinksDefaultVisibility = toVisibilityLevel(
+        dto.socialLinksDefaultVisibility,
+      );
+    }
     if (dto.readReceipts !== undefined) data.readReceipts = dto.readReceipts;
     if (dto.pushNotifications !== undefined) data.pushNotifications = dto.pushNotifications;
     if (dto.messageNotifications !== undefined) {
@@ -124,6 +129,9 @@ export class SettingsService {
       onlineStatusVisibility: fromVisibilityLevel(settings.onlineStatusVisibility),
       readReceipts: settings.readReceipts,
       profileVisibility: fromVisibilityLevel(settings.profileVisibility),
+      socialLinksDefaultVisibility: fromVisibilityLevel(
+        settings.socialLinksDefaultVisibility,
+      ),
       showLastSeen,
       pushNotifications: settings.pushNotifications,
       messageNotifications: settings.messageNotifications,

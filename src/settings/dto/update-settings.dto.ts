@@ -35,6 +35,10 @@ export class UpdateSettingsDto {
   profileVisibility?: (typeof visibility)[number];
 
   @IsOptional()
+  @IsIn(visibility)
+  socialLinksDefaultVisibility?: (typeof visibility)[number];
+
+  @IsOptional()
   @IsBoolean()
   showLastSeen?: boolean;
 

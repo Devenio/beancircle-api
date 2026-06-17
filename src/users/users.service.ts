@@ -72,18 +72,23 @@ export class UsersService {
       });
       if (taken) throw new ConflictException('Username taken');
     }
-    if (dto.cityId) {
-      const city = await this.prisma.city.findUnique({ where: { id: dto.cityId } });
+    const { socialLinks, ...rest } = dto;
+    const jsonLinks = socialLinks !== undefined
+      ? (socialLinks as unknown as import('@prisma/client').Prisma.InputJsonValue)
+      : undefined;
+
+    if (rest.cityId) {
+      const city = await this.prisma.city.findUnique({ where: { id: rest.cityId } });
       if (!city) throw new BadRequestException('Invalid city');
       return this.prisma.user.update({
         where: { id: userId },
-        data: { ...dto, countryId: city.countryId },
+        data: { ...rest, countryId: city.countryId, ...(jsonLinks !== undefined && { socialLinks: jsonLinks }) },
         select: userSelect,
       });
     }
     return this.prisma.user.update({
       where: { id: userId },
-      data: dto,
+      data: { ...rest, ...(jsonLinks !== undefined && { socialLinks: jsonLinks }) },
       select: userSelect,
     });
   }
@@ -104,7 +109,7 @@ export class UsersService {
         favoriteCafes: {
           include: { cafe: { include: { photos: { take: 1 } } } },
         },
-        settings: { select: { profileVisibility: true } },
+        settings: { select: { profileVisibility: true, socialLinksDefaultVisibility: true } },
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -145,13 +150,43 @@ export class UsersService {
       };
     }
 
+    // Per-link visibility: each link may override the user's default. Links
+    // without an explicit `visibility` fall back to socialLinksDefaultVisibility.
+    // Self always passes the gate, so the owner sees every link.
+    const defaultLinkLevel =
+      settings?.socialLinksDefaultVisibility ?? VisibilityLevel.EVERYONE;
+    const rawLinks = Array.isArray(profile.socialLinks) ? profile.socialLinks : [];
+    const filteredLinks: unknown[] = [];
+    for (const link of rawLinks) {
+      const raw = (link as { visibility?: string }).visibility;
+      const level = this.toVisibilityLevel(raw, defaultLinkLevel);
+      if (await this.viewerPassesVisibility(level, user.id, viewerId)) {
+        filteredLinks.push(link);
+      }
+    }
+
     return {
       ...profile,
+      socialLinks: filteredLinks,
       favoriteCafes,
       isFollowing,
       isSelf,
       restricted: false,
     };
+  }
+
+  /** Maps a wire-level visibility string to a `VisibilityLevel`, defaulting to
+   * `fallback` when the value is missing or unrecognized. */
+  private toVisibilityLevel(
+    value: string | undefined,
+    fallback: VisibilityLevel,
+  ): VisibilityLevel {
+    if (!value) return fallback;
+    const lower = value.toLowerCase();
+    if (lower === 'everyone') return VisibilityLevel.EVERYONE;
+    if (lower === 'contacts') return VisibilityLevel.CONTACTS;
+    if (lower === 'nobody') return VisibilityLevel.NOBODY;
+    return fallback;
   }
 
   async follow(followerId: string, followingId: string) {
