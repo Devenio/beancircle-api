@@ -702,14 +702,18 @@ export class ChatService {
       throw new NotFoundException('Message not found');
     }
 
-    const existing = await this.prisma.messageReaction.findUnique({
-      where: {
-        messageId_userId_emoji: { messageId, userId, emoji: normalizedEmoji },
-      },
+    // Each user may have at most one reaction per message. Clicking the same
+    // reaction removes it (toggle off); clicking a different one replaces the
+    // previous reaction.
+    const existing = await this.prisma.messageReaction.findFirst({
+      where: { messageId, userId },
     });
-    if (existing) {
+    if (existing?.emoji === normalizedEmoji) {
       await this.prisma.messageReaction.delete({ where: { id: existing.id } });
     } else {
+      if (existing) {
+        await this.prisma.messageReaction.delete({ where: { id: existing.id } });
+      }
       await this.prisma.messageReaction.create({
         data: { messageId, userId, emoji: normalizedEmoji },
       });
