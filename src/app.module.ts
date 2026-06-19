@@ -19,6 +19,7 @@ import { CommentsModule } from './comments/comments.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
+import { DesignsModule } from './designs/designs.module';
 import { BeanScoreModule } from './beanscore/beanscore.module';
 import { CommunityModule } from './community/community.module';
 import { DiscoverModule } from './discover/discover.module';
@@ -105,6 +106,7 @@ import { UsersModule } from './users/users.module';
     RealtimeModule,
     FeatureFlagsModule,
     SuperAdminModule,
+    DesignsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

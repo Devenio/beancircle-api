@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { CafeOsHooksService } from '../cafe-os/cafe-os-hooks.service';
+import { DesignsService } from '../designs/designs.service';
 import { OwnerService } from '../owner/owner.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -47,6 +48,7 @@ export class MenusService {
     private owner: OwnerService,
     private config: ConfigService,
     private hooks: CafeOsHooksService,
+    private designs: DesignsService,
   ) {}
 
   // ---------- Public ----------
@@ -59,7 +61,15 @@ export class MenusService {
     if (!menu || !menu.isPublished) {
       throw new NotFoundException('Menu not found');
     }
-    return menu;
+    // Resolve which coded designs the public page should render with. This
+    // goes through the same access logic as the cafe panel and falls back to
+    // the default design if the selection is no longer allowed/enabled.
+    const designs = await this.designs.resolveCafeDesigns(menu.cafeId);
+    return {
+      ...menu,
+      menuDesignKey: designs.menu.key,
+      welcomeDesignKey: designs.welcome.key,
+    };
   }
 
   /** Track a public QR scan, optionally attributed to a specific QR code. */

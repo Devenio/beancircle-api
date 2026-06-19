@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CafeOsModule } from '../cafe-os/cafe-os.module';
+import { DesignsModule } from '../designs/designs.module';
 import { OwnerModule } from '../owner/owner.module';
 import { MenusController } from './menus.controller';
 import { MenusService } from './menus.service';
 
 @Module({
-  imports: [OwnerModule, AuthModule, CafeOsModule],
+  imports: [OwnerModule, AuthModule, CafeOsModule, DesignsModule],
   controllers: [MenusController],
   providers: [MenusService],
   exports: [MenusService],

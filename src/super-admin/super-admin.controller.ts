@@ -14,6 +14,9 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../common/guards/super-admin.guard';
+import { DesignsService } from '../designs/designs.service';
+import { GrantDesignAccessDto } from '../designs/dto/designs.dto';
+import type { DesignType } from '../designs/design-registry';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { MenusService } from '../menus/menus.service';
 import { OnboardingFlowService } from '../onboarding/onboarding-flow.service';
@@ -66,7 +69,42 @@ export class SuperAdminController {
     private audit: AuditService,
     private menus: MenusService,
     private flow: OnboardingFlowService,
+    private designs: DesignsService,
   ) {}
+
+  // ---------------- Coded designs (registry + access control) ----------------
+
+  /** Every registered coded design; optionally filtered by ?type=menu|welcome. */
+  @Get('designs')
+  listDesigns(@Query('type') type?: DesignType) {
+    return this.designs.listAll(type);
+  }
+
+  /** Cafes currently whitelisted for a design. */
+  @Get('designs/:key/access')
+  designAccess(@Param('key') key: string) {
+    return this.designs.listAccess(key);
+  }
+
+  /** Whitelist one or more cafes for a design. */
+  @Post('designs/:key/access')
+  grantDesignAccess(
+    @CurrentUser() actor: Actor,
+    @Param('key') key: string,
+    @Body() dto: GrantDesignAccessDto,
+  ) {
+    return this.designs.grantAccess(actor.id, key, dto.cafeIds);
+  }
+
+  /** Revoke a cafe's access to a design (cafe falls back to default). */
+  @Delete('designs/:key/access/:cafeId')
+  revokeDesignAccess(
+    @CurrentUser() actor: Actor,
+    @Param('key') key: string,
+    @Param('cafeId') cafeId: string,
+  ) {
+    return this.designs.revokeAccess(actor.id, key, cafeId);
+  }
 
   // ---------------- Feature flags ----------------
 
