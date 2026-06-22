@@ -400,6 +400,7 @@ model User {
   bannedAt         DateTime?
   suspendedUntil   DateTime?
   moderationNote   String?
+  warningCount     Int        @default(0)
   referralCode     String?    @unique
   referredById     String?
   postsCount       Int        @default(0)
@@ -1572,6 +1573,7 @@ model Report {
   targetId   String
   reason     String
   status     ReportStatus     @default(PENDING)
+  adminNote  String?
   createdAt  DateTime         @default(now())
   reporter   User             @relation(fields: [reporterId], references: [id])
 

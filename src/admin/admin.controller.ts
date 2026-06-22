@@ -1,14 +1,27 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ReportStatus } from '@prisma/client';
-import { IsEnum } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 import { GiftsService } from '../gifts/gifts.service';
 
 class UpdateReportDto {
   @IsEnum(ReportStatus)
   status: ReportStatus;
+}
+
+class ResolveReportDto {
+  @IsOptional()
+  @IsString()
+  adminNote?: string;
+}
+
+class WarnUserDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 @Controller('admin')
@@ -36,8 +49,56 @@ export class AdminController {
   }
 
   @Get('reports')
-  reports(@Query('cursor') cursor?: string) {
-    return this.adminService.listReports(cursor);
+  reports(
+    @Query('cursor') cursor?: string,
+    @Query('status') status?: ReportStatus,
+  ) {
+    return this.adminService.listReports(cursor, status);
+  }
+
+  @Get('reports/:id')
+  getReport(@Param('id') id: string) {
+    return this.adminService.getReport(id);
+  }
+
+  @Patch('reports/:id')
+  updateReport(@Param('id') id: string, @Body() dto: UpdateReportDto) {
+    return this.adminService.updateReport(id, dto.status);
+  }
+
+  @Post('reports/:id/resolve')
+  resolveReport(
+    @CurrentUser() actor: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ResolveReportDto,
+  ) {
+    return this.adminService.resolveReport(actor.id, id, dto.adminNote);
+  }
+
+  @Post('reports/:id/dismiss')
+  dismissReport(
+    @CurrentUser() actor: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ResolveReportDto,
+  ) {
+    return this.adminService.dismissReport(actor.id, id, dto.adminNote);
+  }
+
+  @Delete('reports/:id/content')
+  removeContent(
+    @CurrentUser() actor: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.adminService.removeContent(actor.id, id);
+  }
+
+  @Post('users/:id/warn')
+  warnUser(
+    @CurrentUser() actor: { id: string },
+    @Param('id') id: string,
+    @Body() dto: WarnUserDto,
+  ) {
+    return this.adminService.warnUser(actor.id, id, dto.reason);
   }
 
   @Get('checkins')
@@ -48,10 +109,5 @@ export class AdminController {
   @Get('gifts')
   gifts() {
     return this.giftsService.listAll();
-  }
-
-  @Patch('reports/:id')
-  updateReport(@Param('id') id: string, @Body() dto: UpdateReportDto) {
-    return this.adminService.updateReport(id, dto.status);
   }
 }
