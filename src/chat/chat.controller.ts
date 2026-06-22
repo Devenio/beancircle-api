@@ -124,6 +124,10 @@ class SendMessageDto {
 
   @IsOptional()
   @IsBoolean()
+  liveLocation?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   spoiler?: boolean;
 }
 

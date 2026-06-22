@@ -28,6 +28,7 @@ type SendMessageInput = {
     lng: number;
     label?: string;
   };
+  liveLocation?: boolean;
   sticker?: string;
   replyToId?: string;
   replyToSnippet?: string;
@@ -289,6 +290,7 @@ export class ChatService {
               label: message.locationLabel ?? undefined,
             }
           : undefined,
+      liveLocation: message.body === 'Live location' || undefined,
       sticker: message.sticker ?? undefined,
       replyToId: message.replyToId ?? undefined,
       replyToSnippet: message.replyToSnippet ?? undefined,

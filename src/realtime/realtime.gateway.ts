@@ -273,6 +273,26 @@ export class RealtimeGateway
     });
   }
 
+  @SubscribeMessage('location:update')
+  async handleLocationUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: { conversationId: string; lat: number; lng: number },
+  ) {
+    const socketData = getSocketData(client);
+    const userId = socketData.userId;
+    if (!userId || !data?.conversationId) return;
+    const member = await this.chatService.isMember(data.conversationId, userId);
+    if (!member) return;
+    client.to(`conversation:${data.conversationId}`).emit('location:updated', {
+      userId,
+      conversationId: data.conversationId,
+      lat: data.lat,
+      lng: data.lng,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   /**
    * Reads a single boolean preference from `UserSettings`, defaulting to
    * enabled when no settings row exists yet.
