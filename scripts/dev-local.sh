@@ -154,7 +154,7 @@ start_infra() {
     exit 1
   fi
   log "starting Docker (postgres, redis, minio)..."
-  (cd "$API_DIR" && docker compose up -d postgres redis minio)
+  (cd "$API_DIR" && docker compose up -d postgres redis minio minio-init)
 
   log "waiting for PostgreSQL..."
   local attempt=0
@@ -168,8 +168,7 @@ start_infra() {
   done
   log "PostgreSQL is ready"
 
-  log "configuring MinIO (bucket + CORS)..."
-  bash "$SCRIPT_DIR/setup-minio.sh"
+  log "MinIO bucket configured by minio-init service"
 }
 
 prepare_api() {

@@ -30,7 +30,7 @@ services:
       - miniodata:/data
 
   minio-init:
-    image: minio/mc:RELEASE.2024-12-18T07-45-33Z
+    image: minio/mc:latest
     depends_on:
       - minio
     entrypoint: /bin/sh
