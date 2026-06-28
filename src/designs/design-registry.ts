@@ -53,6 +53,8 @@ export const DESIGN_REGISTRY: readonly RegisteredDesign[] = [
     type: 'menu',
     description:
       'The default menu layout. Always available to every cafe as a safe fallback.',
+    previewImageUrl:
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80',
     enabled: true,
   },
   {
@@ -61,6 +63,8 @@ export const DESIGN_REGISTRY: readonly RegisteredDesign[] = [
     type: 'welcome',
     description:
       'The default welcome screen. Always available to every cafe as a safe fallback.',
+    previewImageUrl:
+      'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=600&q=80',
     enabled: true,
   },
   {
@@ -87,6 +91,8 @@ export const DESIGN_REGISTRY: readonly RegisteredDesign[] = [
     type: 'welcome',
     description:
       'Dark splash with the self-drawing BeanCircle logo, then the cafe title.',
+    previewImageUrl:
+      'https://images.unsplash.com/photo-1514432324607-a09d9b4aefda?w=600&q=80',
     enabled: true,
   },
 ] as const;
