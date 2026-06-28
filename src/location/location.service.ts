@@ -37,13 +37,23 @@ export class LocationService {
       return { ok: true, distanceVisibility: visibility };
     }
 
-    const geohash = encodeGeohash(lat, lng, 7);
+    let storedLat = lat;
+    let storedLng = lng;
+    if (visibility === LocationVisibility.APPROXIMATE) {
+      storedLat = Math.round(lat * 100) / 100;
+      storedLng = Math.round(lng * 100) / 100;
+    } else if (visibility === LocationVisibility.CITY) {
+      storedLat = Math.round(lat * 10) / 10;
+      storedLng = Math.round(lng * 10) / 10;
+    }
+
+    const geohash = encodeGeohash(storedLat, storedLng, visibility === LocationVisibility.EXACT ? 7 : 5);
     await this.prisma.userLocation.upsert({
       where: { userId },
-      create: { userId, latitude: lat, longitude: lng, geohash, cityId: user.cityId },
-      update: { latitude: lat, longitude: lng, geohash, cityId: user.cityId },
+      create: { userId, latitude: storedLat, longitude: storedLng, geohash, cityId: user.cityId },
+      update: { latitude: storedLat, longitude: storedLng, geohash, cityId: user.cityId },
     });
-    await this.redis.geoAddLocation(userId, lng, lat);
+    await this.redis.geoAddLocation(userId, storedLng, storedLat);
     return { ok: true, distanceVisibility: visibility };
   }
 

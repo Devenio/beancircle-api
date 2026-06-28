@@ -4,6 +4,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   MaxLength,
   Min,
@@ -44,7 +45,8 @@ export class CreateEventDto {
   locationLabel?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUrl()
+  @MaxLength(500)
   coverUrl?: string;
 
   @IsISO8601()

@@ -9,11 +9,7 @@ export const validationSchema = Joi.object({
   DATABASE_URL: Joi.string().uri().required(),
   REDIS_URL: Joi.string().uri().required(),
 
-  JWT_SECRET: Joi.when('NODE_ENV', {
-    is: 'production',
-    then: Joi.string().min(32).required(),
-    otherwise: Joi.string().default('change-me-in-production'),
-  }),
+  JWT_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 

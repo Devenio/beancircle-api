@@ -14,7 +14,7 @@ export class RedisService implements OnModuleDestroy {
     await this.client.quit();
   }
 
-  async setOtp(phone: string, code: string, ttlSeconds = 300) {
+  async setOtp(phone: string, code: string, ttlSeconds = 120) {
     await this.client.setex(`otp:${phone}`, ttlSeconds, code);
   }
 
@@ -24,6 +24,30 @@ export class RedisService implements OnModuleDestroy {
 
   async delOtp(phone: string) {
     await this.client.del(`otp:${phone}`);
+  }
+
+  async incrOtpAttempts(phone: string): Promise<number> {
+    const key = `otp_attempts:${phone}`;
+    const n = await this.client.incr(key);
+    if (n === 1) await this.client.expire(key, 120);
+    return n;
+  }
+
+  async delOtpAttempts(phone: string) {
+    await this.client.del(`otp_attempts:${phone}`);
+  }
+
+  async incrSocketConnection(userId: string): Promise<number> {
+    const key = `ws:conn:${userId}`;
+    const n = await this.client.incr(key);
+    if (n === 1) await this.client.expire(key, 300);
+    return n;
+  }
+
+  async decrSocketConnection(userId: string) {
+    const key = `ws:conn:${userId}`;
+    const n = await this.client.decr(key);
+    if (n <= 0) await this.client.del(key);
   }
 
   async setOnline(userId: string) {

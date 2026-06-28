@@ -51,9 +51,21 @@ export class RealtimeGateway
       const payload = await this.jwt.verifyAsync<{ sub: string }>(token);
       const socketData = getSocketData(client);
       socketData.userId = payload.sub;
+
+      const connCount = await this.redis.incrSocketConnection(payload.sub);
+      if (connCount > 5) {
+        await this.redis.decrSocketConnection(payload.sub);
+        client.disconnect();
+        return;
+      }
+
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { username: true, cityId: true },
+        select: {
+          username: true,
+          cityId: true,
+          settings: { select: { showOnlineStatus: true, onlineStatusVisibility: true } },
+        },
       });
       socketData.username = user?.username ?? null;
       await client.join(`user:${payload.sub}`);
@@ -63,7 +75,14 @@ export class RealtimeGateway
         where: { id: payload.sub },
         data: { lastSeenAt: new Date() },
       });
-      this.server.emit('presence', { userId: payload.sub, online: true });
+
+      const showOnline = user?.settings?.showOnlineStatus !== false;
+      if (showOnline) {
+        this.server.to(`city:${user?.cityId ?? 'global'}`).emit('presence', {
+          userId: payload.sub,
+          online: true,
+        });
+      }
     } catch {
       client.disconnect();
     }
@@ -73,16 +92,25 @@ export class RealtimeGateway
     const userId = getSocketData(client).userId;
     if (userId) {
       await this.redis.setOffline(userId);
+      await this.redis.decrSocketConnection(userId);
       const lastSeenAt = new Date();
       await this.prisma.user.update({
         where: { id: userId },
         data: { lastSeenAt },
       });
-      this.server.emit('presence', {
-        userId,
-        online: false,
-        lastSeenAt: lastSeenAt.toISOString(),
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { cityId: true, settings: { select: { showOnlineStatus: true } } },
       });
+      const showOnline = user?.settings?.showOnlineStatus !== false;
+      if (showOnline) {
+        this.server.to(`city:${user?.cityId ?? 'global'}`).emit('presence', {
+          userId,
+          online: false,
+          lastSeenAt: lastSeenAt.toISOString(),
+        });
+      }
     }
   }
 

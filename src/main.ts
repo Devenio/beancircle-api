@@ -27,7 +27,8 @@ async function bootstrap() {
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.getInstance().set('json limit', '1mb');
 
-  if (!isProd) {
+  const swaggerEnabled = config.get('SWAGGER_ENABLED') === 'true';
+  if (swaggerEnabled) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Bean Circle API')
       .setDescription('Cafe Community MVP REST API')
@@ -40,7 +41,9 @@ async function bootstrap() {
 
   const port = config.get<number>('PORT') ?? 3001;
   await app.listen(port);
-  console.log(`API running on http://localhost:${port}/api/v1`);
-  if (!isProd) console.log(`Swagger UI at http://localhost:${port}/docs`);
+  if (!isProd) {
+    console.log(`API running on http://localhost:${port}/api/v1`);
+    if (swaggerEnabled) console.log(`Swagger UI at http://localhost:${port}/docs`);
+  }
 }
 bootstrap();

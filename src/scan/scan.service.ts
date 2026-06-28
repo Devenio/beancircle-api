@@ -35,7 +35,7 @@ export type ScanResolveResult =
     }
   | {
       type: 'daily_deal_voucher';
-      winnerId: string;
+      winnerId?: string;
       voucherCode: string;
       redeemed: boolean;
       cafe: { id: string; name: string };
@@ -200,16 +200,17 @@ export class ScanService {
       return { type: 'unknown', raw: voucherCode };
     }
 
+    const isOwner = winner.userId === viewerId;
     return {
       type: 'daily_deal_voucher',
-      winnerId: winner.id,
       voucherCode: winner.voucherCode,
       redeemed: winner.redeemedAt != null,
       cafe: {
         id: winner.draw.cafe.id,
         name: winner.draw.cafe.name,
       },
-      ownedByViewer: winner.userId === viewerId,
+      ownedByViewer: isOwner,
+      ...(isOwner ? { winnerId: winner.id } : {}),
     };
   }
 

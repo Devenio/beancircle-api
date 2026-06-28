@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, randomUUID } from 'crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { SmsService } from '../sms/sms.service';
@@ -22,7 +22,6 @@ type TokenBundle = {
   refreshToken: string;
   user: {
     id: string;
-    phone: string | null;
     email: string | null;
     username: string | null;
     name: string | null;
@@ -64,7 +63,8 @@ export class AuthService {
     await this.redis.setOtp(phone, code);
 
     if (isMock) {
-      return { message: 'OTP sent (mock)', code };
+      this.logger.log(`OTP for ${phone.slice(0, 4)}**** (mock): ${code}`);
+      return { message: 'OTP sent (mock)' };
     }
 
     const templateId = Number(
@@ -82,12 +82,26 @@ export class AuthService {
     code: string,
     req?: { headers?: Record<string, string | string[] | undefined>; ip?: string },
   ) {
+    const attempts = await this.redis.incrOtpAttempts(phone);
+    if (attempts > 5) {
+      await this.redis.delOtp(phone);
+      await this.redis.delOtpAttempts(phone);
+      throw new UnauthorizedException('Too many attempts. Request a new code.');
+    }
+
     const stored = await this.redis.getOtp(phone);
-    if (!stored || stored !== code) {
-      this.logger.warn(`Failed OTP attempt for ${phone.slice(0, 4)}****`);
+    if (!stored) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const storedBuf = Buffer.from(stored);
+    const codeBuf = Buffer.from(code);
+    if (storedBuf.length !== codeBuf.length || !timingSafeEqual(storedBuf, codeBuf)) {
+      this.logger.warn(`Failed OTP attempt for ${phone.slice(0, 4)}**** (attempt ${attempts}/5)`);
       throw new UnauthorizedException('Invalid OTP');
     }
     await this.redis.delOtp(phone);
+    await this.redis.delOtpAttempts(phone);
 
     let user = await this.prisma.user.findUnique({ where: { phone } });
     if (!user) {
@@ -108,16 +122,10 @@ export class AuthService {
     let user = await this.prisma.user.findUnique({
       where: { googleId: profile.googleId },
     });
-    if (!user && profile.email) {
-      user = await this.prisma.user.findUnique({
-        where: { email: profile.email },
-      });
-    }
     if (user) {
       user = await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          googleId: profile.googleId,
           email: profile.email ?? user.email,
           name: user.name ?? profile.name,
           avatarUrl: user.avatarUrl ?? profile.avatarUrl,
@@ -157,7 +165,7 @@ export class AuthService {
   ) {
     const parsed = this.parseRefreshToken(refreshToken);
     if (!parsed) {
-      return this.refreshLegacy(refreshToken);
+      throw new UnauthorizedException('Invalid refresh token');
     }
 
     const record = await this.prisma.refreshToken.findFirst({
@@ -189,21 +197,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
     return this.issueTokens(user.id, user.role, this.sessionFromRequest(req));
-  }
-
-  private async refreshLegacy(refreshToken: string) {
-    const users = await this.prisma.user.findMany({
-      where: { refreshTokenHash: { not: null } },
-    });
-    for (const user of users) {
-      if (
-        user.refreshTokenHash &&
-        (await bcrypt.compare(refreshToken, user.refreshTokenHash))
-      ) {
-        return this.issueTokens(user.id, user.role);
-      }
-    }
-    throw new UnauthorizedException('Invalid refresh token');
   }
 
   async logout(userId: string, refreshToken?: string) {
@@ -282,7 +275,6 @@ export class AuthService {
       refreshToken,
       user: {
         id: user.id,
-        phone: user.phone,
         email: user.email,
         username: user.username,
         name: user.name,

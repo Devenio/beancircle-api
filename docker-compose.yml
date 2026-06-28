@@ -5,33 +5,32 @@ services:
       POSTGRES_USER: beancircle
       POSTGRES_PASSWORD: beancircle
       POSTGRES_DB: beancircle
-    # Host 5434 avoids conflict with a local PostgreSQL often bound to 5433 on Windows.
     ports:
-      - '5434:5432'
+      - '127.0.0.1:5434:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
+    command: redis-server --requirepass changeme-redis-password
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_API_CORS_ALLOW_ORIGIN: 'http://localhost:3000,http://127.0.0.1:3000'
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
     volumes:
       - miniodata:/data
 
-  # One-shot: bucket + public read + CORS so browser PUT uploads work from localhost:3000
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2024-12-18T07-45-33Z
     depends_on:
       - minio
     entrypoint: /bin/sh
@@ -41,7 +40,6 @@ services:
         set -e
         until mc alias set local http://minio:9000 minioadmin minioadmin 2>/dev/null; do sleep 1; done
         mc mb local/beancircle --ignore-existing
-        mc anonymous set download local/beancircle
     restart: 'no'
 
 volumes:

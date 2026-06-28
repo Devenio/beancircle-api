@@ -41,50 +41,53 @@ export class StreakService {
     type: StreakType,
     when: Date = new Date(),
   ): Promise<StreakTouchResult> {
-    const existing = await this.prisma.userStreak.findUnique({
-      where: { userId_type: { userId, type } },
-    });
-
     const isWeekly = type === StreakType.WEEKLY_CAFE;
     const today = this.dayKey(when);
 
-    let current = 1;
-    let increased = true;
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.userStreak.findUnique({
+        where: { userId_type: { userId, type } },
+      });
 
-    if (existing?.lastEventOn) {
-      const diff = isWeekly
-        ? this.weekDiff(existing.lastEventOn, when)
-        : this.dayDiff(existing.lastEventOn, when);
+      let current = 1;
+      let increased = true;
 
-      if (diff <= 0) {
-        // Same period already counted — no change.
-        return {
-          type,
-          current: existing.current,
-          best: existing.best,
-          increased: false,
-          milestone: null,
-        };
+      if (existing?.lastEventOn) {
+        const diff = isWeekly
+          ? this.weekDiff(existing.lastEventOn, when)
+          : this.dayDiff(existing.lastEventOn, when);
+
+        if (diff <= 0) {
+          return {
+            type,
+            current: existing.current,
+            best: existing.best,
+            increased: false,
+            milestone: null as number | null,
+          };
+        }
+        if (diff === 1) {
+          current = existing.current + 1;
+        } else {
+          current = 1;
+        }
       }
-      if (diff === 1) {
-        current = existing.current + 1;
-      } else {
-        current = 1;
-      }
-    }
 
-    const best = Math.max(current, existing?.best ?? 0);
+      const best = Math.max(current, existing?.best ?? 0);
 
-    await this.prisma.userStreak.upsert({
-      where: { userId_type: { userId, type } },
-      create: { userId, type, current, best, lastEventOn: today },
-      update: { current, best, lastEventOn: today },
+      await tx.userStreak.upsert({
+        where: { userId_type: { userId, type } },
+        create: { userId, type, current, best, lastEventOn: today },
+        update: { current, best, lastEventOn: today },
+      });
+
+      const milestone =
+        increased && MILESTONES.includes(current) ? current : null;
+
+      return { type, current, best, increased, milestone };
     });
 
-    const milestone =
-      increased && MILESTONES.includes(current) ? current : null;
-
-    return { type, current, best, increased, milestone };
+    return result;
   }
 
   async getMine(userId: string) {

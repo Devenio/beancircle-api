@@ -35,8 +35,6 @@ export function requestSessionMeta(req?: {
 }): SessionMeta {
   const raw = req?.headers?.['user-agent'];
   const userAgent = Array.isArray(raw) ? raw[0] : raw;
-  const forwarded = req?.headers?.['x-forwarded-for'];
-  const ipRaw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const ipAddress = ipRaw?.split(',')[0]?.trim() || req?.ip;
+  const ipAddress = req?.ip;
   return { userAgent, ipAddress };
 }

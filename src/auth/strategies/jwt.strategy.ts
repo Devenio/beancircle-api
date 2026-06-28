@@ -10,9 +10,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     config: ConfigService,
     private authService: AuthService,
   ) {
+    const secret = config.getOrThrow<string>('JWT_SECRET');
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: config.get<string>('JWT_SECRET') ?? 'change-me',
+      secretOrKey: secret,
+      algorithms: ['HS256'],
+      issuer: 'beancircle',
+      audience: 'beancircle-api',
     });
   }
 

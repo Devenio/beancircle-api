@@ -6,3 +6,7 @@ dist
 coverage
 test
 *.md
+.claude
+.nvmrc
+.prettierrc
+eslint.config.mjs

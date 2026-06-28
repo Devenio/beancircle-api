@@ -8,7 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { PostType } from '@prisma/client';
-import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID, MaxLength, ArrayMaxSize, IsUrl } from 'class-validator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PostsService } from './posts.service';
@@ -19,6 +19,7 @@ class CreatePostDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   caption?: string;
 
   @IsOptional()
@@ -27,6 +28,8 @@ class CreatePostDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(10)
+  @IsUrl({}, { each: true })
   @IsString({ each: true })
   photoUrls?: string[];
 }

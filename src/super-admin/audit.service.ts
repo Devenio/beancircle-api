@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(private prisma: PrismaService) {}
 
   /** Record a super-admin action. Never throws — auditing must not break flows. */
@@ -18,8 +20,11 @@ export class AuditService {
       await this.prisma.adminAuditLog.create({
         data: { actorId: actorId ?? null, action, entity, entityId, meta },
       });
-    } catch {
-      // best-effort
+    } catch (err) {
+      this.logger.error(
+        `Audit log write failed: action=${action} entity=${entity} entityId=${entityId}`,
+        err instanceof Error ? err.stack : String(err),
+      );
     }
   }
 

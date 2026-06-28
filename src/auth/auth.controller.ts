@@ -64,6 +64,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('google/exchange')
   exchangeGoogle(@Body() dto: GoogleExchangeDto) {
     return this.authService.exchangeGoogleCode(dto.code);

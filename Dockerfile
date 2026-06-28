@@ -14,11 +14,13 @@ RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" pnpm prisma gen
 
 FROM base AS runner
 ENV NODE_ENV=production
+RUN addgroup --system app && adduser --system --ingroup app app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma ./prisma
-# Drop-in menu template files (imported/assigned from the admin panel).
 COPY --from=build /app/menu-templates ./menu-templates
+RUN chown -R app:app /app
+USER app
 EXPOSE 3001
 CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/main.js"]

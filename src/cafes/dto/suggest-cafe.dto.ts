@@ -1,10 +1,12 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class SuggestCafeDto {
   @IsString()
+  @MaxLength(200)
   name: string;
 
   @IsString()
+  @MaxLength(500)
   address: string;
 
   @IsOptional()
@@ -17,5 +19,6 @@ export class SuggestCafeDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string;
 }

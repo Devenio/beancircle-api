@@ -27,8 +27,7 @@ docker run --rm --entrypoint /bin/sh \
     set -e
     until mc alias set local $MINIO_ENDPOINT $MINIO_USER $MINIO_PASS 2>/dev/null; do sleep 1; done
     mc mb local/$BUCKET --ignore-existing
-    mc anonymous set download local/$BUCKET
     mc ls local
   "
 
-log "MinIO bucket '$BUCKET' is ready (public read + CORS for local dev)"
+log "MinIO bucket '$BUCKET' is ready (use presigned URLs for access)"
