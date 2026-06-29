@@ -77,6 +77,16 @@ export const DESIGN_REGISTRY: readonly RegisteredDesign[] = [
     enabled: true,
   },
   {
+    key: 'nan-o-nan-menu',
+    name: 'Nan o Nan',
+    type: 'menu',
+    description:
+      'Warm Persian bakery & coffee layout — glassy category pills, serif headings, and saffron gradient tiles for photo-less items.',
+    previewImageUrl:
+      'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80',
+    enabled: true,
+  },
+  {
     key: 'spotlight-welcome',
     name: 'Spotlight Welcome',
     type: 'welcome',

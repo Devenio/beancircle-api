@@ -1,0 +1,229 @@
+{
+  "key": "nan-o-nan",
+  "name": "Nan o Nan",
+  "description": "Warm Persian bakery & coffee roastery — saffron palette, serif headings. Pairs with the 'Nan o Nan' coded menu design.",
+  "theme": "CUSTOM",
+  "accentColor": "#C96B3C",
+  "themeConfig": {
+    "bg": "#FAF7F2",
+    "surface": "#FFFFFF",
+    "text": "#2A2118",
+    "muted": "#8A7A64",
+    "accent": "#C96B3C",
+    "onAccent": "#FFFFFF",
+    "chip": "#F1E7DA",
+    "border": "rgba(120,70,25,0.14)",
+    "headingFont": "serif",
+    "radius": "1.25rem",
+    "cardStyle": "elevated",
+    "heroTint": "#9C5A2C"
+  },
+  "welcomeTitle": "Nan o Nan",
+  "welcomeMessage": "Artisan bakery & coffee roastery — baked fresh, brewed with care since 1972.",
+  "categories": [
+    {
+      "name": "Coffee",
+      "items": [
+        {
+          "name": "Espresso",
+          "description": "Single-origin shot pulled tight, thick crema, dark-chocolate finish.",
+          "price": 4500,
+          "calories": 5,
+          "ingredients": ["arabica"],
+          "prepTimeMin": 2
+        },
+        {
+          "name": "Flat White",
+          "description": "Double ristretto under a thin veil of silky steamed milk.",
+          "price": 6500,
+          "calories": 120,
+          "allergens": ["dairy"],
+          "prepTimeMin": 3
+        },
+        {
+          "name": "Cappuccino",
+          "description": "Espresso crowned with velvety foam and a dusting of cocoa.",
+          "price": 6000,
+          "calories": 110,
+          "allergens": ["dairy"],
+          "prepTimeMin": 3
+        },
+        {
+          "name": "Saffron Latte",
+          "description": "Our signature — house espresso, saffron-steeped milk and a thread of honey.",
+          "price": 7500,
+          "discountPrice": 6500,
+          "calories": 170,
+          "ingredients": ["saffron", "honey"],
+          "allergens": ["dairy"],
+          "prepTimeMin": 4
+        },
+        {
+          "name": "Cold Brew",
+          "description": "Steeped 18 hours — smooth, low-acid and chocolatey, served over ice.",
+          "price": 6500,
+          "calories": 15,
+          "prepTimeMin": 1
+        },
+        {
+          "name": "Mocha",
+          "description": "Espresso melted into dark chocolate with steamed milk and cream.",
+          "price": 7000,
+          "calories": 240,
+          "allergens": ["dairy"],
+          "prepTimeMin": 4
+        }
+      ]
+    },
+    {
+      "name": "Tea",
+      "items": [
+        {
+          "name": "Saffron Tea",
+          "description": "Golden saffron brew with rock sugar and a whisper of cardamom.",
+          "price": 4000,
+          "calories": 30,
+          "ingredients": ["saffron", "cardamom"],
+          "prepTimeMin": 5
+        },
+        {
+          "name": "Matcha Latte",
+          "description": "Stone-ground ceremonial matcha whisked into creamy oat milk.",
+          "price": 7000,
+          "calories": 150,
+          "ingredients": ["matcha", "oat milk"],
+          "prepTimeMin": 4
+        },
+        {
+          "name": "Masala Chai",
+          "description": "Black tea simmered with milk, ginger, clove and cinnamon.",
+          "price": 6000,
+          "calories": 180,
+          "allergens": ["dairy"],
+          "prepTimeMin": 5
+        }
+      ]
+    },
+    {
+      "name": "Breads",
+      "items": [
+        {
+          "name": "Barbari",
+          "description": "Crisp, sesame-topped Persian flatbread, baked fresh at dawn.",
+          "price": 3000,
+          "ingredients": ["sesame"],
+          "allergens": ["gluten", "sesame"],
+          "prepTimeMin": 10
+        },
+        {
+          "name": "Sangak",
+          "description": "Stone-baked whole-wheat flatbread, blistered, nutty and warm.",
+          "price": 3000,
+          "allergens": ["gluten"],
+          "prepTimeMin": 10
+        },
+        {
+          "name": "Sourdough Loaf",
+          "description": "Naturally leavened, 48-hour ferment, with a crackling burnished crust.",
+          "price": 7000,
+          "allergens": ["gluten"],
+          "prepTimeMin": 15
+        }
+      ]
+    },
+    {
+      "name": "Pastries",
+      "items": [
+        {
+          "name": "Butter Croissant",
+          "description": "Seventy-two layers of French butter, shatteringly crisp, airy within.",
+          "price": 5000,
+          "calories": 280,
+          "allergens": ["gluten", "dairy", "egg"]
+        },
+        {
+          "name": "Pistachio Croissant",
+          "description": "Twice-baked, filled with pistachio frangipane and a rosewater glaze.",
+          "price": 6500,
+          "calories": 360,
+          "ingredients": ["pistachio", "rosewater"],
+          "allergens": ["gluten", "nuts", "dairy", "egg"]
+        },
+        {
+          "name": "Cinnamon Roll",
+          "description": "Soft cardamom-cinnamon swirl under a cream-cheese glaze.",
+          "price": 5500,
+          "calories": 420,
+          "allergens": ["gluten", "dairy", "egg"]
+        },
+        {
+          "name": "Saffron Brioche Bun",
+          "description": "Pillowy saffron brioche, brushed with butter, pearl-sugar crust.",
+          "price": 5000,
+          "calories": 300,
+          "ingredients": ["saffron"],
+          "allergens": ["gluten", "dairy", "egg"]
+        }
+      ]
+    },
+    {
+      "name": "Brunch",
+      "items": [
+        {
+          "name": "Avocado & Feta Toast",
+          "description": "Smashed avocado, crumbled feta and herbs on grilled barbari.",
+          "price": 11000,
+          "calories": 430,
+          "allergens": ["gluten", "dairy"],
+          "prepTimeMin": 12
+        },
+        {
+          "name": "Shakshuka",
+          "description": "Eggs poached in spiced tomato and pepper, feta, with barbari soldiers.",
+          "price": 13000,
+          "calories": 480,
+          "allergens": ["egg", "dairy", "gluten"],
+          "prepTimeMin": 18
+        },
+        {
+          "name": "Labneh & Herb Bowl",
+          "description": "Strained yogurt with olive oil, za'atar, walnuts and garden herbs.",
+          "price": 10000,
+          "calories": 320,
+          "allergens": ["dairy", "nuts"],
+          "prepTimeMin": 10
+        }
+      ]
+    },
+    {
+      "name": "Sweets",
+      "items": [
+        {
+          "name": "Pistachio Baklava",
+          "description": "Layered filo, pistachio and honeyed rose syrup, cut into diamonds.",
+          "price": 5000,
+          "calories": 290,
+          "ingredients": ["pistachio", "honey", "rosewater"],
+          "allergens": ["gluten", "nuts"]
+        },
+        {
+          "name": "Bastani Sonnati",
+          "description": "Saffron and rosewater ice cream, clotted cream, slivered pistachio.",
+          "price": 6000,
+          "discountPrice": 5000,
+          "calories": 310,
+          "ingredients": ["saffron", "rosewater", "pistachio"],
+          "allergens": ["dairy", "nuts"]
+        },
+        {
+          "name": "Date & Tahini Cake",
+          "description": "Sticky date sponge under tahini caramel with a sesame crunch.",
+          "price": 6000,
+          "calories": 380,
+          "ingredients": ["dates", "tahini"],
+          "allergens": ["gluten", "sesame"]
+        }
+      ]
+    }
+  ]
+}
