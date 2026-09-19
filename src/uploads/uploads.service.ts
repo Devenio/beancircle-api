@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 const MIME_MAX_BYTES: Record<string, number> = {
   'image/jpeg': 10 * 1024 * 1024,
@@ -57,7 +57,7 @@ export class UploadsService {
     if (!maxBytes) {
       throw new BadRequestException('Unsupported content type');
     }
-    const key = `${folder}/${userId}/${uuid()}`;
+    const key = `${folder}/${userId}/${randomUUID()}`;
     // NOTE: do not bind Content-Length into the signature — the client uploads
     // its real file size, which would never equal `maxBytes`. `maxBytes` is
     // only returned so the client can validate before uploading.
