@@ -39,7 +39,7 @@ async function bootstrap() {
     SwaggerModule.setup('docs', app, document);
   }
 
-  const port = config.get<number>('PORT') ?? 3001;
+  const port = Number(process.env.PORT) || (config.get('PORT') ?? 3001);
   await app.listen(port);
   if (!isProd) {
     console.log(`API running on http://localhost:${port}/api/v1`);
