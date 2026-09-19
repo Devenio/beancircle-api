@@ -64,7 +64,7 @@ export class AuthService {
 
     if (isMock) {
       this.logger.log(`OTP for ${phone.slice(0, 4)}**** (mock): ${code}`);
-      return { message: 'OTP sent (mock)' };
+      return { message: 'OTP sent (mock)', code };
     }
 
     const templateId = Number(
